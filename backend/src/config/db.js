@@ -5,7 +5,7 @@ dotenv.config();
 
 const { DB_NAME, DB_USER, DB_PASS, DB_HOST } = process.env;
 
-// Crear DB si no existe
+// Si no existe una base de datos se crea una nueva
 const crearBaseDeDatos = async () => {
   const conexion = await mysql.createConnection({
     host: DB_HOST,

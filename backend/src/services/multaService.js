@@ -3,7 +3,7 @@ import { Socio } from "../models/Socio.js";
 
 export const obtenerMultas = async () => {
   return await RegistroMulta.findAll({
-    where: { estado: "ACTIVA" }, // 🔹 corregido aquí
+    where: { estado: "ACTIVA" }, 
     include: [{ model: Socio, attributes: ["idSocio", "nombre", "numeroSocio"] }],
     order: [["fecha", "DESC"], ["idMulta", "DESC"]],
   });
@@ -19,7 +19,7 @@ export const crearMulta = async ({ idSocio, motivo, monto, fecha }) => {
     motivo,
     monto: parseFloat(monto),
     fecha,
-    estado: "ACTIVA", // 🔹 también corregido aquí
+    estado: "ACTIVA", 
   });
 
   return multa;
@@ -29,7 +29,7 @@ export const cancelarMulta = async (idMulta) => {
   const multa = await RegistroMulta.findByPk(idMulta);
   if (!multa) throw new Error("Multa no encontrada");
 
-  multa.estado = "PAGADA"; // 🔹 y aquí
+  multa.estado = "PAGADA"; 
   await multa.save();
 
   return { msg: "Multa cancelada correctamente" };

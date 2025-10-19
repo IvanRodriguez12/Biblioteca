@@ -1,15 +1,7 @@
--- ============================================
--- 📘 SCRIPT DE CREACIÓN DE BASE DE DATOS
--- Sistema de Gestión de Biblioteca
--- ============================================
-
 DROP DATABASE IF EXISTS biblioteca;
 CREATE DATABASE biblioteca CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
 USE biblioteca;
 
--- ===============================
--- 🧍‍♂️ Tabla: Socios
--- ===============================
 CREATE TABLE socio (
   idSocio INT AUTO_INCREMENT PRIMARY KEY,
   nombre VARCHAR(100) NOT NULL,
@@ -19,9 +11,6 @@ CREATE TABLE socio (
   telefono VARCHAR(30)
 );
 
--- ===============================
--- 📚 Tabla: Libros
--- ===============================
 CREATE TABLE libro (
   idLibro INT AUTO_INCREMENT PRIMARY KEY,
   titulo VARCHAR(150) NOT NULL,
@@ -30,9 +19,6 @@ CREATE TABLE libro (
   estado ENUM('DISPONIBLE', 'PRESTADO') DEFAULT 'DISPONIBLE'
 );
 
--- ===============================
--- 🔄 Tabla: Préstamos
--- ===============================
 CREATE TABLE prestamo (
   idPrestamo INT AUTO_INCREMENT PRIMARY KEY,
   idSocio INT NOT NULL,
@@ -46,9 +32,6 @@ CREATE TABLE prestamo (
   CONSTRAINT fk_prestamo_libro FOREIGN KEY (idLibro) REFERENCES libro(idLibro) ON DELETE CASCADE ON UPDATE CASCADE
 );
 
--- ===============================
--- 💰 Tabla: Registro de Multas
--- ===============================
 CREATE TABLE registro_multa (
   idMulta INT AUTO_INCREMENT PRIMARY KEY,
   idPrestamo INT NOT NULL,
