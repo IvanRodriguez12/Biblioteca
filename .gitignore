@@ -1,0 +1,50 @@
+# ========================================
+# 📁 General
+# ========================================
+node_modules/
+dist/
+build/
+.DS_Store
+Thumbs.db
+*.log
+
+# ========================================
+# ⚙️ Backend
+# ========================================
+backend/node_modules/
+backend/.env
+backend/.env.local
+backend/npm-debug.log
+backend/yarn-error.log
+
+# Archivos temporales o de base de datos
+backend/*.sqlite
+backend/*.db
+
+# ========================================
+# 💻 Frontend
+# ========================================
+frontend/node_modules/
+frontend/build/
+frontend/.env
+frontend/.env.local
+frontend/npm-debug.log
+frontend/yarn-error.log
+
+# ========================================
+# 🧠 Sistema operativo / IDE
+# ========================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*.bak
+
+# ========================================
+# ⚡ Otros
+# ========================================
+.env
+*.pid
+*.seed
+*.tgz
+coverage/
