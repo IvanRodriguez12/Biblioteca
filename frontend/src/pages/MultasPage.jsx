@@ -110,12 +110,17 @@ export default function MultasPage() {
           headers: { "Content-Type": "application/json" }
         });
 
-        if (!response.ok) throw new Error("Error al cancelar multa");
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || "Error al cancelar multa");
+        }
 
+        // Refrescar los datos
         await fetchAllData();
+        setError(null);
       } catch (error) {
         console.error("Error al cancelar multa:", error);
-        setError("Error al cancelar la multa");
+        setError(error.message || "Error al cancelar la multa");
       }
     }
   };

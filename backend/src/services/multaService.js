@@ -3,7 +3,6 @@ import { Socio } from "../models/Socio.js";
 
 export const obtenerMultas = async () => {
   return await RegistroMulta.findAll({
-    where: { estado: "ACTIVA" }, 
     include: [{ model: Socio, attributes: ["idSocio", "nombre", "numeroSocio"] }],
     order: [["fecha", "DESC"], ["idMulta", "DESC"]],
   });

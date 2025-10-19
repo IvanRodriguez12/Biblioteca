@@ -7,6 +7,8 @@ import LibrosPage from "./pages/LibrosPage";
 import SociosPage from "./pages/SociosPage";
 import PrestamosPage from "./pages/PrestamosPage";
 import MultasPage from "./pages/MultasPage";
+import AyudaSoportePage from "./pages/AyudaSoportePage";
+import ReportarProblemaPage from "./pages/ReportarProblemaPage";
 
 function App() {
   return (
@@ -20,6 +22,8 @@ function App() {
             <Route path="/socios" element={<SociosPage />} />
             <Route path="/prestamos" element={<PrestamosPage />} />
             <Route path="/multas" element={<MultasPage />} />
+            <Route path="/ayuda-soporte" element={<AyudaSoportePage />} />
+            <Route path="/reportar-problema" element={<ReportarProblemaPage />} />
           </Routes>
         </main>
         <Footer />

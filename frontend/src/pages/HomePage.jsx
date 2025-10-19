@@ -18,11 +18,15 @@ export default function HomePage() {
     try {
       // Aquí irán las llamadas a tu backend
       const [librosRes, sociosRes, prestamosRes, multasRes] = await Promise.all([
-        fetch("http://localhost:5000/api/libros"),
-        fetch("http://localhost:5000/api/socios"),
-        fetch("http://localhost:5000/api/prestamos"),
-        fetch("http://localhost:5000/api/multas"),
+        fetch("http://localhost:3001/api/libros"),
+        fetch("http://localhost:3001/api/socios"),
+        fetch("http://localhost:3001/api/prestamos"),
+        fetch("http://localhost:3001/api/multas"),
       ]);
+
+      if (!librosRes.ok || !sociosRes.ok || !prestamosRes.ok || !multasRes.ok) {
+        throw new Error("Error al obtener datos del servidor");
+      }
 
       const libros = await librosRes.json();
       const socios = await sociosRes.json();
@@ -32,8 +36,8 @@ export default function HomePage() {
       setStats({
         totalLibros: libros.length || 0,
         totalSocios: socios.length || 0,
-        prestamosActivos: prestamos.filter(p => p.estado === "activo").length || 0,
-        multasPendientes: multas.filter(m => m.estado === "pendiente").length || 0,
+        prestamosActivos: prestamos.filter(p => p.estadoPrestamo === "ACTIVO").length || 0,
+        multasPendientes: multas.filter(m => m.estado === "ACTIVA").length || 0,
       });
     } catch (error) {
       console.error("Error al cargar estadísticas:", error);
