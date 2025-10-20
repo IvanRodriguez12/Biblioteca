@@ -24,7 +24,15 @@ export const getLibroById = async (req, res) => {
 // Crear un nuevo libro
 export const crearLibro = async (req, res) => {
   try {
-    const nuevoLibro = await LibroService.crearLibro(req.body);
+    const { titulo, autor, isbn, cantidad } = req.body;
+
+    if (!titulo || !autor || !isbn) {
+      return res.status(400).json({
+        error: "Los campos título, autor e ISBN son obligatorios"
+      });
+    }
+
+    const nuevoLibro = await LibroService.crearLibro({ titulo, autor, isbn, cantidad });
     res.status(201).json({ msg: "Libro agregado correctamente", nuevoLibro });
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -35,10 +43,15 @@ export const crearLibro = async (req, res) => {
 export const actualizarLibro = async (req, res) => {
   try {
     const { id } = req.params;
+
+    if (!id) {
+      return res.status(400).json({ error: "ID de libro es requerido" });
+    }
+
     const libroActualizado = await LibroService.actualizarLibro(id, req.body);
     res.json({ msg: "Libro actualizado correctamente", libroActualizado });
   } catch (error) {
-    res.status(404).json({ error: error.message });
+    res.status(400).json({ error: error.message });
   }
 };
 
@@ -46,9 +59,14 @@ export const actualizarLibro = async (req, res) => {
 export const eliminarLibro = async (req, res) => {
   try {
     const { id } = req.params;
+
+    if (!id) {
+      return res.status(400).json({ error: "ID de libro es requerido" });
+    }
+
     await LibroService.eliminarLibro(id);
     res.json({ msg: "Libro eliminado correctamente" });
   } catch (error) {
-    res.status(404).json({ error: error.message });
+    res.status(400).json({ error: error.message });
   }
 };

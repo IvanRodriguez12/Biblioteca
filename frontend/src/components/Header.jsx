@@ -8,7 +8,7 @@ export default function Header() {
   return (
     <nav className="bg-red-700 text-white shadow-lg">
       <div className="w-full px-6 py-4">
-        <div className="flex items-center justify-between gap-12">
+        <div className="flex items-center justify-between">
           {/* Logo y Nombre */}
           <Link to="/" className="flex items-center gap-3 hover:opacity-90 transition flex-shrink-0">
             <img 
@@ -22,8 +22,8 @@ export default function Header() {
             </div>
           </Link>
 
-          {/* Navegación Central */}
-          <div className="flex gap-8 items-center">
+          {/* Navegación a la derecha */}
+          <div className="flex items-center gap-8">
             <NavLink 
               to="/libros"
               className={({isActive}) => `hover:text-red-200 transition pb-1 text-base font-semibold ${isActive ? "font-bold border-b-2 border-white" : ""}`}
@@ -48,14 +48,14 @@ export default function Header() {
             >
               ⚠️ Multas
             </NavLink>
-          </div>
 
-          {/* Botón Inicio */}
-          {!isHomePage && (
-            <Link to="/" className="bg-red-900 hover:bg-red-800 px-4 py-2 rounded font-semibold transition flex-shrink-0">
-              ← Inicio
-            </Link>
-          )}
+            {/* Botón Inicio */}
+            {!isHomePage && (
+              <Link to="/" className="bg-red-900 hover:bg-red-800 px-4 py-2 rounded font-semibold transition flex-shrink-0">
+                ← Inicio
+              </Link>
+            )}
+          </div>
         </div>
       </div>
     </nav>

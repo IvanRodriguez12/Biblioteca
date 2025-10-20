@@ -6,16 +6,18 @@ export default function LibrosPage() {
   const [error, setError] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [editando, setEditando] = useState(null);
+  const [errorModal, setErrorModal] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [libroAEliminar, setLibroAEliminar] = useState(null);
   const [formData, setFormData] = useState({
     titulo: "",
     autor: "",
     isbn: "",
-    estado: "DISPONIBLE"
+    cantidad: ""
   });
 
   const API_URL = "http://localhost:3001/api/libros";
 
-  // Obtener todos los libros
   useEffect(() => {
     fetchLibros();
   }, []);
@@ -36,60 +38,181 @@ export default function LibrosPage() {
     }
   };
 
-  // Crear o actualizar libro
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      const url = editando ? `${API_URL}/${editando}` : API_URL;
-      const method = editando ? "PUT" : "POST";
-
-      const response = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData)
-      });
-
-      if (!response.ok) throw new Error("Error al guardar libro");
-
-      await fetchLibros();
-      cerrarModal();
-    } catch (error) {
-      console.error("Error al guardar libro:", error);
-      setError("Error al guardar el libro");
+  const validarTitulo = (titulo) => {
+    if (!titulo || titulo.trim().length === 0) {
+      setErrorModal("El título es requerido");
+      return false;
     }
+    if (titulo.trim().length < 3) {
+      setErrorModal("El título debe tener al menos 3 caracteres");
+      return false;
+    }
+    if (titulo.trim().length > 150) {
+      setErrorModal("El título no puede exceder 150 caracteres");
+      return false;
+    }
+    if (!/^[a-zA-ZáéíóúÁÉÍÓÚñÑ0-9\s:,.-]+$/.test(titulo)) {
+      setErrorModal("El título contiene caracteres no válidos");
+      return false;
+    }
+    return true;
   };
 
-  // Eliminar libro
-  const eliminarLibro = async (id) => {
-    if (window.confirm("¿Estás seguro de eliminar este libro?")) {
-      try {
-        const response = await fetch(`${API_URL}/${id}`, { 
-          method: "DELETE" 
-        });
+  const validarAutor = (autor) => {
+    if (!autor || autor.trim().length === 0) {
+      setErrorModal("El autor es requerido");
+      return false;
+    }
+    if (autor.trim().length < 3) {
+      setErrorModal("El autor debe tener al menos 3 caracteres");
+      return false;
+    }
+    if (autor.trim().length > 100) {
+      setErrorModal("El autor no puede exceder 100 caracteres");
+      return false;
+    }
+    if (!/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s,.-]+$/.test(autor)) {
+      setErrorModal("El autor solo puede contener letras, espacios y símbolos básicos");
+      return false;
+    }
+    return true;
+  };
 
+  const validarISBN = (isbn) => {
+    if (!isbn || isbn.trim().length === 0) {
+      setErrorModal("El ISBN es requerido");
+      return false;
+    }
+    if (!/^[0-9\-]+$/.test(isbn)) {
+      setErrorModal("El ISBN solo puede contener números y guiones");
+      return false;
+    }
+    if (isbn.length < 10 || isbn.length > 17) {
+      setErrorModal("El ISBN debe tener entre 10 y 17 caracteres");
+      return false;
+    }
+    return true;
+  };
+
+  const handleNumberInput = (value, min = 0, max = 999) => {
+    if (value === "" || value === undefined) return min;
+    if (value.length > 3) return max;
+    const num = Number(value);
+    if (isNaN(num)) return min;
+    return Math.max(Math.min(num, max), min);
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    setErrorModal(null);
+
+    if (!validarTitulo(formData.titulo)) return;
+    if (!validarAutor(formData.autor)) return;
+    if (!validarISBN(formData.isbn)) return;
+
+    const cantidad = parseInt(formData.cantidad) || 0;
+
+    if (cantidad < 1 || cantidad > 200) {
+      setErrorModal("La cantidad debe estar entre 1 y 200 copias");
+      return;
+    }
+
+    // Para crear: todos disponibles, 0 prestados y 0 dañados
+    // Para editar: mantener valores de dañados y prestados
+    let datosEnvio;
+    if (editando) {
+      datosEnvio = {
+        titulo: formData.titulo,
+        autor: formData.autor,
+        isbn: formData.isbn,
+        cantidadDisponible: formData.cantidadDisponible,
+        cantidadPrestado: formData.cantidadPrestado,
+        cantidadDanado: formData.cantidadDanado
+      };
+      
+      const suma = parseInt(formData.cantidadDisponible) + parseInt(formData.cantidadPrestado) + parseInt(formData.cantidadDanado);
+      if (suma > 200) {
+        setErrorModal("La suma total no puede exceder 200 copias");
+        return;
+      }
+    } else {
+      datosEnvio = {
+        titulo: formData.titulo,
+        autor: formData.autor,
+        isbn: formData.isbn,
+        cantidad: cantidad,
+        cantidadDisponible: cantidad,
+        cantidadPrestado: 0,
+        cantidadDanado: 0
+      };
+    }
+
+    const url = editando ? `${API_URL}/${editando}` : API_URL;
+    const method = editando ? "PUT" : "POST";
+
+    fetch(url, {
+      method,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(datosEnvio)
+    })
+      .then(response => {
+        if (!response.ok) throw new Error("Error al guardar libro");
+        return response.json();
+      })
+      .then(() => {
+        fetchLibros();
+        cerrarModal();
+      })
+      .catch(error => {
+        console.error("Error al guardar libro:", error);
+        setErrorModal(error.message || "Error al guardar el libro");
+      });
+  };
+
+  const abrirModalEliminar = (libro) => {
+    setLibroAEliminar(libro);
+    setShowDeleteModal(true);
+  };
+
+  const confirmarEliminar = () => {
+    if (!libroAEliminar) return;
+
+    fetch(`${API_URL}/${libroAEliminar.idLibro}`, { 
+      method: "DELETE" 
+    })
+      .then(response => {
         if (!response.ok) throw new Error("Error al eliminar");
-
-        await fetchLibros();
-      } catch (error) {
+        fetchLibros();
+        setShowDeleteModal(false);
+        setLibroAEliminar(null);
+      })
+      .catch(error => {
         console.error("Error al eliminar libro:", error);
         setError("Error al eliminar el libro");
-      }
-    }
+        setShowDeleteModal(false);
+        setLibroAEliminar(null);
+      });
   };
 
-  // Abrir modal para editar
+  const cancelarEliminar = () => {
+    setShowDeleteModal(false);
+    setLibroAEliminar(null);
+  };
+
   const editarLibro = (libro) => {
-    setEditando(libro.id || libro.idLibro);
+    setEditando(libro.idLibro);
     setFormData({
       titulo: libro.titulo,
       autor: libro.autor,
       isbn: libro.isbn,
-      estado: libro.estado
+      cantidad: libro.cantidad,
+      cantidadDisponible: libro.cantidadDisponible,
+      cantidadPrestado: libro.cantidadPrestado,
+      cantidadDanado: libro.cantidadDanado
     });
     setShowModal(true);
   };
 
-  // Cerrar modal y resetear form
   const cerrarModal = () => {
     setShowModal(false);
     setEditando(null);
@@ -97,8 +220,9 @@ export default function LibrosPage() {
       titulo: "",
       autor: "",
       isbn: "",
-      estado: "DISPONIBLE"
+      cantidad: ""
     });
+    setErrorModal(null);
   };
 
   if (loading) {
@@ -127,55 +251,59 @@ export default function LibrosPage() {
         </button>
       </div>
 
-      {/* Mensaje de error */}
       {error && (
         <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
           {error}
         </div>
       )}
 
-      {/* Tabla de libros */}
       {libros.length > 0 ? (
-        <div className="bg-white rounded-lg shadow-md overflow-hidden">
+        <div className="bg-white rounded-lg shadow-md overflow-x-auto">
           <table className="w-full">
             <thead className="bg-red-700 text-white">
               <tr>
-                <th className="px-6 py-4 text-left font-semibold">ID</th>
-                <th className="px-6 py-4 text-left font-semibold">Título</th>
-                <th className="px-6 py-4 text-left font-semibold">Autor</th>
-                <th className="px-6 py-4 text-left font-semibold">ISBN</th>
-                <th className="px-6 py-4 text-left font-semibold">Estado</th>
-                <th className="px-6 py-4 text-center font-semibold">Acciones</th>
+                <th className="px-4 py-4 text-left font-semibold">ID</th>
+                <th className="px-4 py-4 text-left font-semibold">Título</th>
+                <th className="px-4 py-4 text-left font-semibold">Autor</th>
+                <th className="px-4 py-4 text-left font-semibold">ISBN</th>
+                <th className="px-4 py-4 text-center font-semibold">✅ Disponible</th>
+                <th className="px-4 py-4 text-center font-semibold">📤 Prestado</th>
+                <th className="px-4 py-4 text-center font-semibold">❌ Dañado</th>
+                <th className="px-4 py-4 text-center font-semibold">Acciones</th>
               </tr>
             </thead>
             <tbody>
               {libros.map((libro) => (
-                <tr key={libro.id || libro.idLibro} className="border-b hover:bg-gray-50 transition">
-                  <td className="px-6 py-4 text-gray-700">{libro.id || libro.idLibro}</td>
-                  <td className="px-6 py-4 font-semibold text-gray-900">{libro.titulo}</td>
-                  <td className="px-6 py-4 text-gray-700">{libro.autor}</td>
-                  <td className="px-6 py-4 text-gray-700 font-mono text-sm">{libro.isbn}</td>
-                  <td className="px-6 py-4">
-                    <span className={`px-3 py-1 rounded-full text-sm font-semibold inline-block ${
-                      libro.estado === "DISPONIBLE" 
-                        ? "bg-green-100 text-green-800" 
-                        : libro.estado === "PRESTADO"
-                        ? "bg-yellow-100 text-yellow-800"
-                        : "bg-red-100 text-red-800"
-                    }`}>
-                      {libro.estado}
+                <tr key={libro.idLibro} className="border-b hover:bg-gray-50 transition">
+                  <td className="px-4 py-4 text-gray-700">{libro.idLibro}</td>
+                  <td className="px-4 py-4 font-semibold text-gray-900">{libro.titulo}</td>
+                  <td className="px-4 py-4 text-gray-700">{libro.autor}</td>
+                  <td className="px-4 py-4 text-gray-700 font-mono text-sm">{libro.isbn}</td>
+                  <td className="px-4 py-4 text-center">
+                    <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-semibold">
+                      {libro.cantidadDisponible}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-center space-x-2">
+                  <td className="px-4 py-4 text-center">
+                    <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-semibold">
+                      {libro.cantidadPrestado}
+                    </span>
+                  </td>
+                  <td className="px-4 py-4 text-center">
+                    <span className="bg-red-100 text-red-800 px-3 py-1 rounded-full text-sm font-semibold">
+                      {libro.cantidadDanado}
+                    </span>
+                  </td>
+                  <td className="px-4 py-4 text-center space-x-2">
                     <button
                       onClick={() => editarLibro(libro)}
-                      className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded font-semibold transition inline-block"
+                      className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded font-semibold transition inline-block"
                     >
                       Editar
                     </button>
                     <button
-                      onClick={() => eliminarLibro(libro.id || libro.idLibro)}
-                      className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded font-semibold transition inline-block"
+                      onClick={() => abrirModalEliminar(libro)}
+                      className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded font-semibold transition inline-block"
                     >
                       Eliminar
                     </button>
@@ -193,79 +321,166 @@ export default function LibrosPage() {
         </div>
       )}
 
-      {/* Modal para crear/editar */}
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-8 w-full max-w-md shadow-xl">
+          <div className="bg-white rounded-lg p-8 w-full max-w-2xl shadow-xl max-h-screen overflow-y-auto">
             <h2 className="text-2xl font-bold mb-6 text-gray-900">
               {editando ? "✏️ Editar Libro" : "➕ Agregar Libro"}
             </h2>
-            <form onSubmit={handleSubmit}>
-              <div className="mb-4">
-                <label className="block text-gray-700 font-semibold mb-2">Título *</label>
-                <input
-                  type="text"
-                  value={formData.titulo}
-                  onChange={(e) => setFormData({...formData, titulo: e.target.value})}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                  placeholder="Ingresa el título del libro"
-                  required
-                />
+
+            {errorModal && (
+              <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
+                {errorModal}
+              </div>
+            )}
+
+            <div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-gray-700 font-semibold mb-2">Título *</label>
+                  <input
+                    type="text"
+                    value={formData.titulo}
+                    onChange={(e) => setFormData({...formData, titulo: e.target.value})}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    placeholder="Ej: Don Quijote"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">3-150 caracteres</p>
+                </div>
+
+                <div>
+                  <label className="block text-gray-700 font-semibold mb-2">Autor *</label>
+                  <input
+                    type="text"
+                    value={formData.autor}
+                    onChange={(e) => setFormData({...formData, autor: e.target.value})}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    placeholder="Ej: Miguel de Cervantes"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">3-100 caracteres, solo letras</p>
+                </div>
+
+                <div>
+                  <label className="block text-gray-700 font-semibold mb-2">ISBN *</label>
+                  <input
+                    type="text"
+                    value={formData.isbn}
+                    onChange={(e) => setFormData({...formData, isbn: e.target.value})}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    placeholder="Ej: 978-84-11-47"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">10-17 caracteres (números y guiones)</p>
+                </div>
+
+                {!editando && (
+                  <div>
+                    <label className="block text-gray-700 font-semibold mb-2">Cantidad Total *</label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={formData.cantidad}
+                      onChange={(e) => {
+                        const cant = handleNumberInput(e.target.value, 1, 200);
+                        setFormData({...formData, cantidad: cant});
+                      }}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                      placeholder="Ingresa la cantidad"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">1-200 copias (máx 3 dígitos)</p>
+                  </div>
+                )}
               </div>
 
-              <div className="mb-4">
-                <label className="block text-gray-700 font-semibold mb-2">Autor *</label>
-                <input
-                  type="text"
-                  value={formData.autor}
-                  onChange={(e) => setFormData({...formData, autor: e.target.value})}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                  placeholder="Ingresa el nombre del autor"
-                  required
-                />
-              </div>
+              {editando && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                  <div>
+                    <label className="block text-gray-700 font-semibold mb-2">✅ Disponibles *</label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={formData.cantidadDisponible}
+                      onChange={(e) => setFormData({...formData, cantidadDisponible: handleNumberInput(e.target.value, 0, 200)})}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    />
+                  </div>
 
-              <div className="mb-4">
-                <label className="block text-gray-700 font-semibold mb-2">ISBN *</label>
-                <input
-                  type="text"
-                  value={formData.isbn}
-                  onChange={(e) => setFormData({...formData, isbn: e.target.value})}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                  placeholder="Ingresa el ISBN"
-                  required
-                />
-              </div>
+                  <div>
+                    <label className="block text-gray-700 font-semibold mb-2">📤 Prestados *</label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={formData.cantidadPrestado}
+                      onChange={(e) => setFormData({...formData, cantidadPrestado: handleNumberInput(e.target.value, 0, 200)})}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    />
+                  </div>
 
-              <div className="mb-6">
-                <label className="block text-gray-700 font-semibold mb-2">Estado *</label>
-                <select
-                  value={formData.estado}
-                  onChange={(e) => setFormData({...formData, estado: e.target.value})}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                >
-                  <option value="DISPONIBLE">✅ DISPONIBLE</option>
-                  <option value="PRESTADO">📤 PRESTADO</option>
-                  <option value="DAÑADO">❌ DAÑADO</option>
-                </select>
-              </div>
+                  <div>
+                    <label className="block text-gray-700 font-semibold mb-2">❌ Dañados *</label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={formData.cantidadDanado}
+                      onChange={(e) => setFormData({...formData, cantidadDanado: handleNumberInput(e.target.value, 0, 200)})}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+              )}
 
-              <div className="flex gap-3">
+              {editando && (
+                <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm text-blue-800">
+                    <strong>Total:</strong> {(parseInt(formData.cantidadDisponible) || 0) + (parseInt(formData.cantidadPrestado) || 0) + (parseInt(formData.cantidadDanado) || 0)} copias
+                  </p>
+                </div>
+              )}
+
+              <div className="flex gap-3 mt-6">
                 <button
-                  type="submit"
+                  onClick={handleSubmit}
                   className="flex-1 bg-red-700 hover:bg-red-800 text-white py-2 rounded-lg font-semibold transition shadow-md hover:shadow-lg"
                 >
                   {editando ? "🔄 Actualizar" : "✨ Crear"}
                 </button>
                 <button
-                  type="button"
                   onClick={cerrarModal}
                   className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 py-2 rounded-lg font-semibold transition"
                 >
                   Cancelar
                 </button>
               </div>
-            </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDeleteModal && libroAEliminar && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-8 w-full max-w-md shadow-xl">
+            <h2 className="text-2xl font-bold mb-4 text-gray-900">⚠️ Confirmar eliminación</h2>
+            
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-gray-700">
+                ¿Estás seguro de que deseas eliminar el libro <strong>{libroAEliminar.titulo}</strong>?
+              </p>
+              <p className="text-sm text-gray-600 mt-2">Esta acción no se puede deshacer.</p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={confirmarEliminar}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg font-semibold transition"
+              >
+                🗑️ Eliminar
+              </button>
+              <button
+                onClick={cancelarEliminar}
+                className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 py-2 rounded-lg font-semibold transition"
+              >
+                Cancelar
+              </button>
+            </div>
           </div>
         </div>
       )}

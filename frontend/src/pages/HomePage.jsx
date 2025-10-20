@@ -48,16 +48,14 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-6 py-6">
-          <h1 className="text-3xl font-bold text-gray-900">Panel de Control - Bibliotecario</h1>
-          <p className="text-gray-600 mt-1">Sistema de gestión de biblioteca</p>
+      <div className="max-w-7xl mx-auto px-4 py-12">
+        {/* Título de la página */}
+        <div className="mb-10">
+          <h1 className="text-4xl font-bold text-gray-900">Panel de Control</h1>
+          <p className="text-gray-600 mt-1 text-lg">Sistema de gestión de biblioteca</p>
         </div>
-      </div>
 
-      {/* Quick Stats */}
-      <div className="max-w-7xl mx-auto px-6 py-10">
+        {/* Quick Stats */}
         <div className="grid grid-cols-4 gap-6 mb-10">
           <div className="bg-white rounded-lg shadow p-6 border-t-4 border-blue-500">
             <div className="flex items-center justify-between">

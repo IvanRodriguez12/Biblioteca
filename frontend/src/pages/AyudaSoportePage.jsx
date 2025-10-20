@@ -28,7 +28,7 @@ export default function AyudaSoportePage() {
           animation: slideDown 0.3s ease-out;
         }
       `}</style>
-      <div className="max-w-4xl mx-auto px-4 py-12">
+      <div className="max-w-7xl mx-auto px-4 py-12">
         <div className="mb-10">
           <h1 className="text-4xl font-bold text-gray-900 mb-3">Ayuda y Soporte</h1>
           <p className="text-gray-600 text-lg">Conoce cómo funciona el sistema y sus limitaciones</p>
