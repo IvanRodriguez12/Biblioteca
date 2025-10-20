@@ -7,7 +7,7 @@ export default function PrestamosPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showModal, setShowModal] = useState(false);
-  const [modalMode, setModalMode] = useState("crear"); // "crear" o "devolver"
+  const [modalMode, setModalMode] = useState("crear");
   const [selectedPrestamo, setSelectedPrestamo] = useState(null);
   const [errorModal, setErrorModal] = useState(null);
   const [formData, setFormData] = useState({
@@ -16,34 +16,11 @@ export default function PrestamosPage() {
     fechaInicio: "",
     fechaDevolucion: ""
   });
-  const [fechaDevolucionReal, setFechaDevolucionReal] = useState("");
-
-  // Convertir formato DD/MM/YYYY a YYYY-MM-DD
-  const convertirAISO = (fecha) => {
-    const [dia, mes, año] = fecha.split("/");
-    return `${año}-${mes}-${dia}`;
-  };
-
-  // Convertir formato YYYY-MM-DD a DD/MM/YYYY
-  const convertirALocal = (fecha) => {
-    if (!fecha) return "";
-    const [año, mes, dia] = fecha.split("-");
-    return `${dia}/${mes}/${año}`;
-  };
-
-  // Validar formato DD/MM/YYYY
-  const validarFecha = (fecha) => {
-    const regex = /^(\d{2})\/(\d{2})\/(\d{4})$/;
-    if (!regex.test(fecha)) return false;
-    const [, dia, mes, año] = fecha.match(regex);
-    return dia <= 31 && mes <= 12 && año >= 1900 && año <= 2100;
-  };
 
   const API_URL = "http://localhost:3001/api/prestamos";
   const SOCIOS_URL = "http://localhost:3001/api/socios";
   const LIBROS_URL = "http://localhost:3001/api/libros";
 
-  // Obtener datos iniciales
   useEffect(() => {
     fetchAllData();
   }, []);
@@ -77,12 +54,22 @@ export default function PrestamosPage() {
     }
   };
 
-  // Crear préstamo
+  const convertirAISO = (fecha) => {
+    const [dia, mes, año] = fecha.split("/");
+    return `${año}-${mes}-${dia}`;
+  };
+
+  const validarFecha = (fecha) => {
+    const regex = /^(\d{2})\/(\d{2})\/(\d{4})$/;
+    if (!regex.test(fecha)) return false;
+    const [, dia, mes, año] = fecha.match(regex);
+    return dia <= 31 && mes <= 12 && año >= 1900 && año <= 2100;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorModal(null);
 
-    // Validaciones
     if (!formData.idSocio) {
       setErrorModal("Debes seleccionar un socio");
       return;
@@ -113,7 +100,6 @@ export default function PrestamosPage() {
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
 
-    // No permite fecha pasada
     if (fechaInicio < hoy) {
       setErrorModal("La fecha de inicio no puede ser una fecha pasada");
       return;
@@ -124,7 +110,6 @@ export default function PrestamosPage() {
       return;
     }
 
-    // No puede ser más de 50 años desde la fecha de inicio
     const fechaDevolucionMax = new Date(fechaInicio);
     fechaDevolucionMax.setFullYear(fechaDevolucionMax.getFullYear() + 50);
 
@@ -138,8 +123,8 @@ export default function PrestamosPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          idSocio: formData.idSocio,
-          idLibro: formData.idLibro,
+          idSocio: parseInt(formData.idSocio),
+          idLibro: parseInt(formData.idLibro),
           fechaInicio: convertirAISO(formData.fechaInicio),
           fechaDevolucion: convertirAISO(formData.fechaDevolucion)
         })
@@ -158,14 +143,12 @@ export default function PrestamosPage() {
     }
   };
 
-  // Registrar devolución
-  const handleDevolucion = async (e) => {
-    e.preventDefault();
+  const handleDevolucion = async () => {
     setErrorModal(null);
 
-    const hoy = new Date().toISOString().split('T')[0];
-
     try {
+      const hoy = new Date().toISOString().split('T')[0];
+      
       const response = await fetch(`${API_URL}/${selectedPrestamo.idPrestamo}/devolver`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -187,15 +170,12 @@ export default function PrestamosPage() {
     }
   };
 
-  // Abrir modal para devolución
   const abrirModalDevolucion = (prestamo) => {
     setSelectedPrestamo(prestamo);
     setModalMode("devolver");
-    setFechaDevolucionReal("");
     setShowModal(true);
   };
 
-  // Cerrar modal
   const cerrarModal = () => {
     setShowModal(false);
     setModalMode("crear");
@@ -206,33 +186,30 @@ export default function PrestamosPage() {
       fechaInicio: "",
       fechaDevolucion: ""
     });
-    setFechaDevolucionReal("");
     setErrorModal(null);
   };
 
-  // Obtener nombre de socio
   const getNombreSocio = (idSocio) => {
     const socio = socios.find(s => s.idSocio === idSocio);
     return socio ? socio.nombre : "Desconocido";
   };
 
-  // Obtener título de libro
   const getTituloLibro = (idLibro) => {
-    const libro = libros.find(l => l.id === idLibro || l.idLibro === idLibro);
+    const libro = libros.find(l => l.idLibro === idLibro);
     return libro ? libro.titulo : "Desconocido";
   };
 
-  // Calcular si hay retraso
   const hayRetraso = (fechaDevolucion, estadoPrestamo) => {
     if (estadoPrestamo !== "ACTIVO") return false;
     return new Date(fechaDevolucion) < new Date();
   };
 
-  // Filtrar libros disponibles
-  const librosDisponibles = libros.filter(l => 
-    l.estado === "DISPONIBLE" || 
-    !prestamos.some(p => p.idLibro === (l.id || l.idLibro) && p.estadoPrestamo === "ACTIVO")
-  );
+  const librosDisponibles = libros.filter(l => l.cantidadDisponible > 0);
+
+  const prestamosPorEstado = {
+    activos: prestamos.filter(p => p.estadoPrestamo === "ACTIVO"),
+    cerrados: prestamos.filter(p => p.estadoPrestamo === "CERRADO")
+  };
 
   if (loading) {
     return (
@@ -250,7 +227,7 @@ export default function PrestamosPage() {
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-4xl font-bold text-gray-900">Gestión de Préstamos</h1>
-          <p className="text-gray-600 mt-1">Total: {prestamos.length} préstamo(s)</p>
+          <p className="text-gray-600 mt-1">Total: {prestamos.length} préstamo(s) - Activos: {prestamosPorEstado.activos.length}</p>
         </div>
         <button
           onClick={() => {
@@ -270,77 +247,120 @@ export default function PrestamosPage() {
       )}
 
       {prestamos.length > 0 ? (
-        <div className="bg-white rounded-lg shadow-md overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-purple-600 text-white">
-              <tr>
-                <th className="px-6 py-4 text-left font-semibold">ID</th>
-                <th className="px-6 py-4 text-left font-semibold">Socio</th>
-                <th className="px-6 py-4 text-left font-semibold">Libro</th>
-                <th className="px-6 py-4 text-left font-semibold">Fecha Inicio</th>
-                <th className="px-6 py-4 text-left font-semibold">Fecha Vencimiento</th>
-                <th className="px-6 py-4 text-left font-semibold">Estado</th>
-                <th className="px-6 py-4 text-left font-semibold">Multa</th>
-                <th className="px-6 py-4 text-center font-semibold">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {prestamos.map((prestamo) => (
-                <tr 
-                  key={prestamo.idPrestamo} 
-                  className={`border-b hover:bg-gray-50 transition ${
-                    hayRetraso(prestamo.fechaDevolucion, prestamo.estadoPrestamo) 
-                      ? "bg-red-50" 
-                      : ""
-                  }`}
-                >
-                  <td className="px-6 py-4 text-gray-700">{prestamo.idPrestamo}</td>
-                  <td className="px-6 py-4 font-semibold text-gray-900">
-                    {getNombreSocio(prestamo.idSocio)}
-                  </td>
-                  <td className="px-6 py-4 text-gray-700">
-                    {getTituloLibro(prestamo.idLibro)}
-                  </td>
-                  <td className="px-6 py-4 text-gray-700">
-                    {new Date(prestamo.fechaInicio).toLocaleDateString("es-ES")}
-                  </td>
-                  <td className="px-6 py-4 text-gray-700">
-                    <span className={hayRetraso(prestamo.fechaDevolucion, prestamo.estadoPrestamo) ? "text-red-600 font-semibold" : ""}>
-                      {new Date(prestamo.fechaDevolucion).toLocaleDateString("es-ES")}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`px-3 py-1 rounded-full text-sm font-semibold inline-block ${
-                      prestamo.estadoPrestamo === "ACTIVO"
-                        ? hayRetraso(prestamo.fechaDevolucion, prestamo.estadoPrestamo)
-                          ? "bg-red-100 text-red-800"
-                          : "bg-blue-100 text-blue-800"
-                        : "bg-green-100 text-green-800"
-                    }`}>
-                      {prestamo.estadoPrestamo}
-                      {hayRetraso(prestamo.fechaDevolucion, prestamo.estadoPrestamo) && " ⚠️"}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-gray-700 font-semibold">
-                    ${parseFloat(prestamo.multa || 0).toFixed(2)}
-                  </td>
-                  <td className="px-6 py-4 text-center">
-                    {prestamo.estadoPrestamo === "ACTIVO" && (
-                      <button
-                        onClick={() => abrirModalDevolucion(prestamo)}
-                        className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded font-semibold transition"
+        <div className="space-y-6">
+          <div className="bg-white rounded-lg shadow-md overflow-hidden">
+            <div className="bg-purple-600 text-white px-6 py-4">
+              <h2 className="text-xl font-bold">Préstamos Activos ({prestamosPorEstado.activos.length})</h2>
+            </div>
+            {prestamosPorEstado.activos.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="px-6 py-4 text-left font-semibold">ID</th>
+                      <th className="px-6 py-4 text-left font-semibold">Socio</th>
+                      <th className="px-6 py-4 text-left font-semibold">Libro</th>
+                      <th className="px-6 py-4 text-left font-semibold">Fecha Inicio</th>
+                      <th className="px-6 py-4 text-left font-semibold">Fecha Vencimiento</th>
+                      <th className="px-6 py-4 text-left font-semibold">Estado</th>
+                      <th className="px-6 py-4 text-center font-semibold">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {prestamosPorEstado.activos.map((prestamo) => (
+                      <tr 
+                        key={prestamo.idPrestamo}
+                        className={`border-b hover:bg-gray-50 transition ${
+                          hayRetraso(prestamo.fechaDevolucion, prestamo.estadoPrestamo) 
+                            ? "bg-red-50" 
+                            : ""
+                        }`}
                       >
-                        Devolver
-                      </button>
-                    )}
-                    {prestamo.estadoPrestamo === "CERRADO" && (
-                      <span className="text-gray-500 text-sm">Finalizado</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                        <td className="px-6 py-4 text-gray-700">{prestamo.idPrestamo}</td>
+                        <td className="px-6 py-4 font-semibold text-gray-900">
+                          {getNombreSocio(prestamo.idSocio)}
+                        </td>
+                        <td className="px-6 py-4 text-gray-700">
+                          {getTituloLibro(prestamo.idLibro)}
+                        </td>
+                        <td className="px-6 py-4 text-gray-700">
+                          {new Date(prestamo.fechaInicio).toLocaleDateString("es-ES")}
+                        </td>
+                        <td className="px-6 py-4 text-gray-700">
+                          <span className={hayRetraso(prestamo.fechaDevolucion, prestamo.estadoPrestamo) ? "text-red-600 font-semibold" : ""}>
+                            {new Date(prestamo.fechaDevolucion).toLocaleDateString("es-ES")}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`px-3 py-1 rounded-full text-sm font-semibold inline-block ${
+                            hayRetraso(prestamo.fechaDevolucion, prestamo.estadoPrestamo)
+                              ? "bg-red-100 text-red-800"
+                              : "bg-blue-100 text-blue-800"
+                          }`}>
+                            ACTIVO {hayRetraso(prestamo.fechaDevolucion, prestamo.estadoPrestamo) && "⚠️"}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <button
+                            onClick={() => abrirModalDevolucion(prestamo)}
+                            className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded font-semibold transition"
+                          >
+                            Devolver
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="p-6 text-center text-gray-500">No hay préstamos activos</div>
+            )}
+          </div>
+
+          {prestamosPorEstado.cerrados.length > 0 && (
+            <div className="bg-white rounded-lg shadow-md overflow-hidden">
+              <div className="bg-gray-600 text-white px-6 py-4">
+                <h2 className="text-xl font-bold">Préstamos Cerrados ({prestamosPorEstado.cerrados.length})</h2>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="px-6 py-4 text-left font-semibold">ID</th>
+                      <th className="px-6 py-4 text-left font-semibold">Socio</th>
+                      <th className="px-6 py-4 text-left font-semibold">Libro</th>
+                      <th className="px-6 py-4 text-left font-semibold">Fecha Inicio</th>
+                      <th className="px-6 py-4 text-left font-semibold">Fecha Vencimiento</th>
+                      <th className="px-6 py-4 text-left font-semibold">Multa</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {prestamosPorEstado.cerrados.map((prestamo) => (
+                      <tr key={prestamo.idPrestamo} className="border-b hover:bg-gray-50 transition">
+                        <td className="px-6 py-4 text-gray-700">{prestamo.idPrestamo}</td>
+                        <td className="px-6 py-4 font-semibold text-gray-900">
+                          {getNombreSocio(prestamo.idSocio)}
+                        </td>
+                        <td className="px-6 py-4 text-gray-700">
+                          {getTituloLibro(prestamo.idLibro)}
+                        </td>
+                        <td className="px-6 py-4 text-gray-700">
+                          {new Date(prestamo.fechaInicio).toLocaleDateString("es-ES")}
+                        </td>
+                        <td className="px-6 py-4 text-gray-700">
+                          {new Date(prestamo.fechaDevolucion).toLocaleDateString("es-ES")}
+                        </td>
+                        <td className="px-6 py-4 font-semibold">
+                          ${parseFloat(prestamo.multa || 0).toFixed(2)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         <div className="bg-white rounded-lg shadow-md p-12 text-center">
@@ -350,13 +370,12 @@ export default function PrestamosPage() {
         </div>
       )}
 
-      {/* Modal para crear/devolver */}
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-8 w-full max-w-md shadow-xl">
+          <div className="bg-white rounded-lg p-8 w-full max-w-md shadow-xl max-h-screen overflow-y-auto">
             {modalMode === "crear" ? (
               <>
-                <h2 className="text-2xl font-bold mb-6 text-gray-900">📚 Nuevo Préstamo</h2>
+                <h2 className="text-2xl font-bold mb-6 text-gray-900">Nuevo Préstamo</h2>
                 
                 {errorModal && (
                   <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
@@ -364,14 +383,13 @@ export default function PrestamosPage() {
                   </div>
                 )}
 
-                <form onSubmit={handleSubmit}>
+                <div>
                   <div className="mb-4">
                     <label className="block text-gray-700 font-semibold mb-2">Socio *</label>
                     <select
                       value={formData.idSocio}
-                      onChange={(e) => setFormData({...formData, idSocio: parseInt(e.target.value)})}
+                      onChange={(e) => setFormData({...formData, idSocio: e.target.value})}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                      required
                     >
                       <option value="">Selecciona un socio</option>
                       {socios.map(s => (
@@ -386,14 +404,13 @@ export default function PrestamosPage() {
                     <label className="block text-gray-700 font-semibold mb-2">Libro *</label>
                     <select
                       value={formData.idLibro}
-                      onChange={(e) => setFormData({...formData, idLibro: parseInt(e.target.value)})}
+                      onChange={(e) => setFormData({...formData, idLibro: e.target.value})}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                      required
                     >
                       <option value="">Selecciona un libro disponible</option>
                       {librosDisponibles.map(l => (
-                        <option key={l.id || l.idLibro} value={l.id || l.idLibro}>
-                          {l.titulo}
+                        <option key={l.idLibro} value={l.idLibro}>
+                          {l.titulo} ({l.cantidadDisponible} disponible{l.cantidadDisponible !== 1 ? "s" : ""})
                         </option>
                       ))}
                     </select>
@@ -407,16 +424,14 @@ export default function PrestamosPage() {
                       value={formData.fechaInicio}
                       onChange={(e) => {
                         const valor = e.target.value;
-                        // Solo permitir números y barras
                         if (/^[\d/]*$/.test(valor) && valor.length <= 10) {
                           setFormData({...formData, fechaInicio: valor});
                         }
                       }}
                       maxLength="10"
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-gray-700 font-medium"
-                      required
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                     />
-                    <p className="text-xs text-gray-500 mt-1">Formato: DD/MM/YYYY. No puede ser una fecha pasada. Máximo 50 años desde hoy.</p>
+                    <p className="text-xs text-gray-500 mt-1">No puede ser una fecha pasada</p>
                   </div>
 
                   <div className="mb-6">
@@ -427,38 +442,35 @@ export default function PrestamosPage() {
                       value={formData.fechaDevolucion}
                       onChange={(e) => {
                         const valor = e.target.value;
-                        // Solo permitir números y barras
                         if (/^[\d/]*$/.test(valor) && valor.length <= 10) {
                           setFormData({...formData, fechaDevolucion: valor});
                         }
                       }}
                       maxLength="10"
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-gray-700 font-medium"
-                      required
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                     />
-                    <p className="text-xs text-gray-500 mt-1">Formato: DD/MM/YYYY. Máximo 50 años desde la fecha de inicio</p>
+                    <p className="text-xs text-gray-500 mt-1">Máximo 50 años desde la fecha de inicio</p>
                   </div>
 
                   <div className="flex gap-3">
                     <button
-                      type="submit"
+                      onClick={handleSubmit}
                       className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg font-semibold transition shadow-md hover:shadow-lg"
                     >
-                      ✨ Crear Préstamo
+                      Crear Préstamo
                     </button>
                     <button
-                      type="button"
                       onClick={cerrarModal}
                       className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 py-2 rounded-lg font-semibold transition"
                     >
                       Cancelar
                     </button>
                   </div>
-                </form>
+                </div>
               </>
             ) : (
               <>
-                <h2 className="text-2xl font-bold mb-6 text-gray-900">📖 Confirmar Devolución</h2>
+                <h2 className="text-2xl font-bold mb-6 text-gray-900">Confirmar Devolución</h2>
                 
                 {errorModal && (
                   <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
@@ -485,6 +497,11 @@ export default function PrestamosPage() {
                   <p className="text-sm text-blue-800">
                     <strong>ℹ️ La devolución se registrará con la fecha de hoy</strong>
                   </p>
+                  {selectedPrestamo && new Date(selectedPrestamo.fechaDevolucion) < new Date() && (
+                    <p className="text-sm text-red-700 mt-2">
+                      <strong>⚠️ Hay retraso. Se calculará automáticamente una multa de $0.50 por día.</strong>
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex gap-3">
@@ -492,10 +509,9 @@ export default function PrestamosPage() {
                     onClick={handleDevolucion}
                     className="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-semibold transition shadow-md hover:shadow-lg"
                   >
-                    ✓ Confirmar Devolución
+                    Confirmar Devolución
                   </button>
                   <button
-                    type="button"
                     onClick={cerrarModal}
                     className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 py-3 rounded-lg font-semibold transition"
                   >
