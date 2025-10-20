@@ -9,6 +9,7 @@ export default function PrestamosPage() {
   const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState("crear"); // "crear" o "devolver"
   const [selectedPrestamo, setSelectedPrestamo] = useState(null);
+  const [errorModal, setErrorModal] = useState(null);
   const [formData, setFormData] = useState({
     idSocio: "",
     idLibro: "",
@@ -16,6 +17,27 @@ export default function PrestamosPage() {
     fechaDevolucion: ""
   });
   const [fechaDevolucionReal, setFechaDevolucionReal] = useState("");
+
+  // Convertir formato DD/MM/YYYY a YYYY-MM-DD
+  const convertirAISO = (fecha) => {
+    const [dia, mes, año] = fecha.split("/");
+    return `${año}-${mes}-${dia}`;
+  };
+
+  // Convertir formato YYYY-MM-DD a DD/MM/YYYY
+  const convertirALocal = (fecha) => {
+    if (!fecha) return "";
+    const [año, mes, dia] = fecha.split("-");
+    return `${dia}/${mes}/${año}`;
+  };
+
+  // Validar formato DD/MM/YYYY
+  const validarFecha = (fecha) => {
+    const regex = /^(\d{2})\/(\d{2})\/(\d{4})$/;
+    if (!regex.test(fecha)) return false;
+    const [, dia, mes, año] = fecha.match(regex);
+    return dia <= 31 && mes <= 12 && año >= 1900 && año <= 2100;
+  };
 
   const API_URL = "http://localhost:3001/api/prestamos";
   const SOCIOS_URL = "http://localhost:3001/api/socios";
@@ -58,42 +80,110 @@ export default function PrestamosPage() {
   // Crear préstamo
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setErrorModal(null);
+
+    // Validaciones
+    if (!formData.idSocio) {
+      setErrorModal("Debes seleccionar un socio");
+      return;
+    }
+    if (!formData.idLibro) {
+      setErrorModal("Debes seleccionar un libro");
+      return;
+    }
+    if (!formData.fechaInicio) {
+      setErrorModal("La fecha de inicio es requerida");
+      return;
+    }
+    if (!validarFecha(formData.fechaInicio)) {
+      setErrorModal("La fecha de inicio no es válida (formato: DD/MM/YYYY)");
+      return;
+    }
+    if (!formData.fechaDevolucion) {
+      setErrorModal("La fecha de vencimiento es requerida");
+      return;
+    }
+    if (!validarFecha(formData.fechaDevolucion)) {
+      setErrorModal("La fecha de vencimiento no es válida (formato: DD/MM/YYYY)");
+      return;
+    }
+
+    const fechaInicio = new Date(convertirAISO(formData.fechaInicio));
+    const fechaDevolucion = new Date(convertirAISO(formData.fechaDevolucion));
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+
+    // No permite fecha pasada
+    if (fechaInicio < hoy) {
+      setErrorModal("La fecha de inicio no puede ser una fecha pasada");
+      return;
+    }
+
+    if (fechaInicio >= fechaDevolucion) {
+      setErrorModal("La fecha de vencimiento debe ser posterior a la fecha de inicio");
+      return;
+    }
+
+    // No puede ser más de 50 años desde la fecha de inicio
+    const fechaDevolucionMax = new Date(fechaInicio);
+    fechaDevolucionMax.setFullYear(fechaDevolucionMax.getFullYear() + 50);
+
+    if (fechaDevolucion > fechaDevolucionMax) {
+      setErrorModal("El préstamo no puede superar 50 años de duración");
+      return;
+    }
+
     try {
       const response = await fetch(API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData)
+        body: JSON.stringify({
+          idSocio: formData.idSocio,
+          idLibro: formData.idLibro,
+          fechaInicio: convertirAISO(formData.fechaInicio),
+          fechaDevolucion: convertirAISO(formData.fechaDevolucion)
+        })
       });
 
-      if (!response.ok) throw new Error("Error al crear préstamo");
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Error al crear préstamo");
+      }
 
       await fetchAllData();
       cerrarModal();
     } catch (error) {
       console.error("Error al crear préstamo:", error);
-      setError("Error al crear el préstamo");
+      setErrorModal(error.message || "Error al crear el préstamo");
     }
   };
 
   // Registrar devolución
   const handleDevolucion = async (e) => {
     e.preventDefault();
+    setErrorModal(null);
+
+    const hoy = new Date().toISOString().split('T')[0];
+
     try {
       const response = await fetch(`${API_URL}/${selectedPrestamo.idPrestamo}/devolver`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          fechaRealDevolucion: fechaDevolucionReal
+          fechaRealDevolucion: hoy
         })
       });
 
-      if (!response.ok) throw new Error("Error al registrar devolución");
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Error al registrar devolución");
+      }
 
       await fetchAllData();
       cerrarModal();
     } catch (error) {
       console.error("Error al registrar devolución:", error);
-      setError("Error al registrar la devolución");
+      setErrorModal(error.message || "Error al registrar la devolución");
     }
   };
 
@@ -117,6 +207,7 @@ export default function PrestamosPage() {
       fechaDevolucion: ""
     });
     setFechaDevolucionReal("");
+    setErrorModal(null);
   };
 
   // Obtener nombre de socio
@@ -266,6 +357,13 @@ export default function PrestamosPage() {
             {modalMode === "crear" ? (
               <>
                 <h2 className="text-2xl font-bold mb-6 text-gray-900">📚 Nuevo Préstamo</h2>
+                
+                {errorModal && (
+                  <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
+                    {errorModal}
+                  </div>
+                )}
+
                 <form onSubmit={handleSubmit}>
                   <div className="mb-4">
                     <label className="block text-gray-700 font-semibold mb-2">Socio *</label>
@@ -302,25 +400,43 @@ export default function PrestamosPage() {
                   </div>
 
                   <div className="mb-4">
-                    <label className="block text-gray-700 font-semibold mb-2">Fecha Inicio *</label>
+                    <label className="block text-gray-700 font-semibold mb-2">Fecha Inicio (DD/MM/YYYY) *</label>
                     <input
-                      type="date"
+                      type="text"
+                      placeholder="DD/MM/YYYY"
                       value={formData.fechaInicio}
-                      onChange={(e) => setFormData({...formData, fechaInicio: e.target.value})}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      onChange={(e) => {
+                        const valor = e.target.value;
+                        // Solo permitir números y barras
+                        if (/^[\d/]*$/.test(valor) && valor.length <= 10) {
+                          setFormData({...formData, fechaInicio: valor});
+                        }
+                      }}
+                      maxLength="10"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-gray-700 font-medium"
                       required
                     />
+                    <p className="text-xs text-gray-500 mt-1">Formato: DD/MM/YYYY. No puede ser una fecha pasada. Máximo 50 años desde hoy.</p>
                   </div>
 
                   <div className="mb-6">
-                    <label className="block text-gray-700 font-semibold mb-2">Fecha Vencimiento *</label>
+                    <label className="block text-gray-700 font-semibold mb-2">Fecha Vencimiento (DD/MM/YYYY) *</label>
                     <input
-                      type="date"
+                      type="text"
+                      placeholder="DD/MM/YYYY"
                       value={formData.fechaDevolucion}
-                      onChange={(e) => setFormData({...formData, fechaDevolucion: e.target.value})}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      onChange={(e) => {
+                        const valor = e.target.value;
+                        // Solo permitir números y barras
+                        if (/^[\d/]*$/.test(valor) && valor.length <= 10) {
+                          setFormData({...formData, fechaDevolucion: valor});
+                        }
+                      }}
+                      maxLength="10"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-gray-700 font-medium"
                       required
                     />
+                    <p className="text-xs text-gray-500 mt-1">Formato: DD/MM/YYYY. Máximo 50 años desde la fecha de inicio</p>
                   </div>
 
                   <div className="flex gap-3">
@@ -342,46 +458,50 @@ export default function PrestamosPage() {
               </>
             ) : (
               <>
-                <h2 className="text-2xl font-bold mb-6 text-gray-900">📖 Registrar Devolución</h2>
-                <div className="mb-4 p-4 bg-gray-100 rounded-lg">
-                  <p className="text-sm text-gray-700">
+                <h2 className="text-2xl font-bold mb-6 text-gray-900">📖 Confirmar Devolución</h2>
+                
+                {errorModal && (
+                  <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
+                    {errorModal}
+                  </div>
+                )}
+
+                <div className="mb-6 p-4 bg-gray-100 rounded-lg border-l-4 border-blue-500">
+                  <p className="text-sm text-gray-700 mb-3">
                     <strong>Socio:</strong> {selectedPrestamo && getNombreSocio(selectedPrestamo.idSocio)}
                   </p>
-                  <p className="text-sm text-gray-700 mt-2">
+                  <p className="text-sm text-gray-700 mb-3">
                     <strong>Libro:</strong> {selectedPrestamo && getTituloLibro(selectedPrestamo.idLibro)}
                   </p>
-                  <p className="text-sm text-gray-700 mt-2">
+                  <p className="text-sm text-gray-700 mb-3">
+                    <strong>Fecha Inicio:</strong> {selectedPrestamo && new Date(selectedPrestamo.fechaInicio).toLocaleDateString("es-ES")}
+                  </p>
+                  <p className="text-sm text-gray-700">
                     <strong>Fecha Vencimiento:</strong> {selectedPrestamo && new Date(selectedPrestamo.fechaDevolucion).toLocaleDateString("es-ES")}
                   </p>
                 </div>
-                <form onSubmit={handleDevolucion}>
-                  <div className="mb-6">
-                    <label className="block text-gray-700 font-semibold mb-2">Fecha Real de Devolución *</label>
-                    <input
-                      type="date"
-                      value={fechaDevolucionReal}
-                      onChange={(e) => setFechaDevolucionReal(e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                      required
-                    />
-                  </div>
 
-                  <div className="flex gap-3">
-                    <button
-                      type="submit"
-                      className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg font-semibold transition shadow-md hover:shadow-lg"
-                    >
-                      ✓ Confirmar Devolución
-                    </button>
-                    <button
-                      type="button"
-                      onClick={cerrarModal}
-                      className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 py-2 rounded-lg font-semibold transition"
-                    >
-                      Cancelar
-                    </button>
-                  </div>
-                </form>
+                <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm text-blue-800">
+                    <strong>ℹ️ La devolución se registrará con la fecha de hoy</strong>
+                  </p>
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleDevolucion}
+                    className="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-semibold transition shadow-md hover:shadow-lg"
+                  >
+                    ✓ Confirmar Devolución
+                  </button>
+                  <button
+                    type="button"
+                    onClick={cerrarModal}
+                    className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 py-3 rounded-lg font-semibold transition"
+                  >
+                    Cancelar
+                  </button>
+                </div>
               </>
             )}
           </div>

@@ -147,16 +147,7 @@ export default function AyudaSoportePage() {
                   <strong>Préstamos Activos:</strong> Solo se pueden registrar devoluciones de préstamos que estén en estado ACTIVO.
                 </li>
                 <li>
-                  <strong>Acceso Restringido:</strong> El sistema no tiene autenticación, por lo que debe estar en una red segura.
-                </li>
-                <li>
-                  <strong>Formato de Fechas:</strong> Las fechas deben estar en formato YYYY-MM-DD (2024-12-31).
-                </li>
-                <li>
                   <strong>Eliminación de Datos:</strong> Eliminar un socio eliminará todos sus préstamos y multas asociadas.
-                </li>
-                <li>
-                  <strong>Conexión a Base de Datos:</strong> El sistema requiere una conexión estable a la base de datos.
                 </li>
               </ul>
             </div>

@@ -9,10 +9,10 @@ export default function MultasPage() {
   const [formData, setFormData] = useState({
     idSocio: "",
     motivo: "",
-    monto: "",
-    fecha: ""
+    monto: ""
   });
   const [filtroEstado, setFiltroEstado] = useState("ACTIVA");
+  const [errorModal, setErrorModal] = useState(null);
 
   const API_URL = "http://localhost:3001/api/multas";
   const SOCIOS_URL = "http://localhost:3001/api/socios";
@@ -51,35 +51,46 @@ export default function MultasPage() {
   // Crear multa
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setErrorModal(null);
+
+    // Validar selección de socio
+    if (!formData.idSocio) {
+      setErrorModal("Debes seleccionar un socio");
+      return;
+    }
+
+    // Validar selección de motivo
+    if (!formData.motivo) {
+      setErrorModal("Debes seleccionar un motivo");
+      return;
+    }
+
+    // Validar monto
+    if (!formData.monto) {
+      setErrorModal("El monto es requerido");
+      return;
+    }
+
+    const monto = parseFloat(formData.monto);
+    if (isNaN(monto) || monto <= 0) {
+      setErrorModal("El monto debe ser un número válido mayor a 0");
+      return;
+    }
+
+    if (monto > 10000) {
+      setErrorModal("El monto no puede exceder $10,000");
+      return;
+    }
+
     try {
-      // Validar que todos los campos estén completos
-      if (!formData.idSocio || !formData.motivo || !formData.monto || !formData.fecha) {
-        setError("Todos los campos son requeridos");
-        return;
-      }
-
-      // Validar que el monto sea un número válido
-      const monto = parseFloat(formData.monto);
-      if (isNaN(monto) || monto <= 0) {
-        setError("El monto debe ser un número válido mayor a 0");
-        return;
-      }
-
-      // Validar que la fecha sea válida y en formato correcto
-      const fecha = new Date(formData.fecha);
-      if (isNaN(fecha.getTime())) {
-        setError("La fecha no es válida");
-        return;
-      }
-
+      const hoy = new Date().toISOString().split('T')[0];
+      
       const multaData = {
         idSocio: parseInt(formData.idSocio),
         motivo: formData.motivo,
         monto: monto,
-        fecha: formData.fecha // Debe estar en formato YYYY-MM-DD
+        fecha: hoy
       };
-
-      console.log("Enviando multa:", multaData);
 
       const response = await fetch(API_URL, {
         method: "POST",
@@ -97,7 +108,7 @@ export default function MultasPage() {
       setError(null);
     } catch (error) {
       console.error("Error al crear multa:", error);
-      setError(error.message || "Error al crear la multa");
+      setErrorModal(error.message || "Error al crear la multa");
     }
   };
 
@@ -115,7 +126,6 @@ export default function MultasPage() {
           throw new Error(errorData.error || "Error al cancelar multa");
         }
 
-        // Refrescar los datos
         await fetchAllData();
         setError(null);
       } catch (error) {
@@ -131,9 +141,9 @@ export default function MultasPage() {
     setFormData({
       idSocio: "",
       motivo: "",
-      monto: "",
-      fecha: ""
+      monto: ""
     });
+    setErrorModal(null);
   };
 
   // Obtener nombre de socio
@@ -312,6 +322,13 @@ export default function MultasPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg p-8 w-full max-w-md shadow-xl">
             <h2 className="text-2xl font-bold mb-6 text-gray-900">➕ Nueva Multa</h2>
+            
+            {errorModal && (
+              <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
+                {errorModal}
+              </div>
+            )}
+
             <form onSubmit={handleSubmit}>
               <div className="mb-4">
                 <label className="block text-gray-700 font-semibold mb-2">Socio *</label>
@@ -351,24 +368,21 @@ export default function MultasPage() {
                 <input
                   type="number"
                   step="0.01"
-                  min="0"
+                  min="0.01"
+                  max="10000"
                   value={formData.monto}
                   onChange={(e) => setFormData({...formData, monto: e.target.value})}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
                   placeholder="0.00"
                   required
                 />
+                <p className="text-xs text-gray-500 mt-1">Monto máximo: $10,000</p>
               </div>
 
-              <div className="mb-6">
-                <label className="block text-gray-700 font-semibold mb-2">Fecha *</label>
-                <input
-                  type="date"
-                  value={formData.fecha}
-                  onChange={(e) => setFormData({...formData, fecha: e.target.value})}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                  required
-                />
+              <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-800">
+                  <strong>ℹ️ Información:</strong> La multa se registrará automáticamente con la fecha de hoy.
+                </p>
               </div>
 
               <div className="flex gap-3">

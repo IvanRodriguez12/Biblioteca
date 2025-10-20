@@ -12,6 +12,7 @@ export default function SociosPage() {
     email: "",
     telefono: ""
   });
+  const [errorModal, setErrorModal] = useState(null);
 
   const API_URL = "http://localhost:3001/api/socios";
 
@@ -39,6 +40,71 @@ export default function SociosPage() {
   // Crear o actualizar socio
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Limpiar errores previos
+    setErrorModal(null);
+
+    // Validar nombre
+    if (!formData.nombre || formData.nombre.trim().length === 0) {
+      setErrorModal("El nombre es requerido");
+      return;
+    }
+    if (formData.nombre.trim().length < 3) {
+      setErrorModal("El nombre debe tener al menos 3 caracteres");
+      return;
+    }
+    if (formData.nombre.trim().length > 100) {
+      setErrorModal("El nombre no puede exceder 100 caracteres");
+      return;
+    }
+    if (!/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/.test(formData.nombre)) {
+      setErrorModal("El nombre solo puede contener letras y espacios");
+      return;
+    }
+
+    // Validar DNI
+    if (!formData.dni || formData.dni.trim().length === 0) {
+      setErrorModal("El DNI es requerido");
+      return;
+    }
+    if (formData.dni.length < 7 || formData.dni.length > 10) {
+      setErrorModal("El DNI debe tener entre 7 y 10 caracteres");
+      return;
+    }
+    if (!/^\d+$/.test(formData.dni)) {
+      setErrorModal("El DNI solo puede contener números");
+      return;
+    }
+
+    // Validar Email
+    if (!formData.email || formData.email.trim().length === 0) {
+      setErrorModal("El email es requerido");
+      return;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      setErrorModal("El email no es válido");
+      return;
+    }
+    if (formData.email.length > 100) {
+      setErrorModal("El email no puede exceder 100 caracteres");
+      return;
+    }
+
+    // Validar Teléfono
+    if (!formData.telefono || formData.telefono.trim().length === 0) {
+      setErrorModal("El teléfono es requerido");
+      return;
+    }
+    if (!/^[\d\s\-\+]+$/.test(formData.telefono)) {
+      setErrorModal("El teléfono solo puede contener números, espacios, guiones y +");
+      return;
+    }
+    if (formData.telefono.length < 7 || formData.telefono.length > 20) {
+      setErrorModal("El teléfono debe tener entre 7 y 20 caracteres");
+      return;
+    }
+
     try {
       const url = editando ? `${API_URL}/${editando}` : API_URL;
       const method = editando ? "PUT" : "POST";
@@ -49,13 +115,17 @@ export default function SociosPage() {
         body: JSON.stringify(formData)
       });
 
-      if (!response.ok) throw new Error("Error al guardar socio");
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Error al guardar socio");
+      }
 
       await fetchSocios();
       cerrarModal();
+      setError(null);
     } catch (error) {
       console.error("Error al guardar socio:", error);
-      setError("Error al guardar el socio");
+      setErrorModal(error.message || "Error al guardar el socio");
     }
   };
 
@@ -99,6 +169,7 @@ export default function SociosPage() {
       email: "",
       telefono: ""
     });
+    setErrorModal(null);
   };
 
   if (loading) {
@@ -190,6 +261,13 @@ export default function SociosPage() {
             <h2 className="text-2xl font-bold mb-6 text-gray-900">
               {editando ? "✏️ Editar Socio" : "➕ Agregar Socio"}
             </h2>
+
+            {errorModal && (
+              <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
+                {errorModal}
+              </div>
+            )}
+
             <form onSubmit={handleSubmit}>
               <div className="mb-4">
                 <label className="block text-gray-700 font-semibold mb-2">Nombre *</label>
