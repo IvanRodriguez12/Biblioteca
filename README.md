@@ -1,7 +1,7 @@
 # Sistema de Gestión de Biblioteca 📚
 
 ## 🏛️ Descripción general
-El **Sistema de Gestión de Biblioteca** permite al bibliotecario administrar todos los procesos de la biblioteca municipal de forma digital.  
+El **Sistema de Gestión de Biblioteca** permite al bibliotecario administrar todos los procesos de la Biblioteca Magna de forma digital.  
 Incluye módulos para gestionar **libros, socios, préstamos y multas**, todo con una interfaz moderna, responsive y conectada a una base de datos MySQL mediante un backend en Node.js.
 
 ---
