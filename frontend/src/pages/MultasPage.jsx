@@ -3,21 +3,24 @@ import React, { useState, useEffect } from "react";
 export default function MultasPage() {
   const [multas, setMultas] = useState([]);
   const [socios, setSocios] = useState([]);
+  const [prestamos, setPrestamos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState({
     idSocio: "",
     motivo: "",
-    monto: ""
+    monto: "",
+    idPrestamo: ""
   });
   const [filtroEstado, setFiltroEstado] = useState("ACTIVA");
   const [errorModal, setErrorModal] = useState(null);
+  const [prestamosFiltrados, setPrestamosFiltrados] = useState([]);
 
   const API_URL = "http://localhost:3001/api/multas";
   const SOCIOS_URL = "http://localhost:3001/api/socios";
+  const PRESTAMOS_URL = "http://localhost:3001/api/prestamos";
 
-  // Obtener multas y socios
   useEffect(() => {
     fetchAllData();
   }, []);
@@ -25,20 +28,23 @@ export default function MultasPage() {
   const fetchAllData = async () => {
     try {
       setLoading(true);
-      const [multasRes, sociosRes] = await Promise.all([
+      const [multasRes, sociosRes, prestamosRes] = await Promise.all([
         fetch(API_URL),
-        fetch(SOCIOS_URL)
+        fetch(SOCIOS_URL),
+        fetch(PRESTAMOS_URL)
       ]);
 
-      if (!multasRes.ok || !sociosRes.ok) {
+      if (!multasRes.ok || !sociosRes.ok || !prestamosRes.ok) {
         throw new Error("Error al obtener datos");
       }
 
       const multasData = await multasRes.json();
       const sociosData = await sociosRes.json();
+      const prestamosData = await prestamosRes.json();
 
       setMultas(multasData);
       setSocios(sociosData);
+      setPrestamos(prestamosData);
       setError(null);
     } catch (error) {
       console.error("Error al obtener datos:", error);
@@ -48,24 +54,44 @@ export default function MultasPage() {
     }
   };
 
-  // Crear multa
+  useEffect(() => {
+    if (formData.idSocio) {
+      const prestamosSocio = prestamos.filter(
+        p => p.idSocio === parseInt(formData.idSocio) && p.estadoPrestamo === "ACTIVO"
+      );
+      setPrestamosFiltrados(prestamosSocio);
+      
+      if (prestamosSocio.length === 1) {
+        setFormData(prev => ({...prev, idPrestamo: prestamosSocio[0].idPrestamo}));
+      } else {
+        setFormData(prev => ({...prev, idPrestamo: ""}));
+      }
+    } else {
+      setPrestamosFiltrados([]);
+      setFormData(prev => ({...prev, idPrestamo: ""}));
+    }
+  }, [formData.idSocio, prestamos]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorModal(null);
 
-    // Validar selección de socio
     if (!formData.idSocio) {
       setErrorModal("Debes seleccionar un socio");
       return;
     }
 
-    // Validar selección de motivo
     if (!formData.motivo) {
       setErrorModal("Debes seleccionar un motivo");
       return;
     }
 
-    // Validar monto
+    const motivosQueRequierenPrestamo = ["Retraso en devolución", "Libro dañado", "Libro extraviado"];
+    if (motivosQueRequierenPrestamo.includes(formData.motivo) && !formData.idPrestamo) {
+      setErrorModal("Debes seleccionar un préstamo para este tipo de multa");
+      return;
+    }
+
     if (!formData.monto) {
       setErrorModal("El monto es requerido");
       return;
@@ -89,7 +115,8 @@ export default function MultasPage() {
         idSocio: parseInt(formData.idSocio),
         motivo: formData.motivo,
         monto: monto,
-        fecha: hoy
+        fecha: hoy,
+        idPrestamo: formData.idPrestamo ? parseInt(formData.idPrestamo) : null
       };
 
       const response = await fetch(API_URL, {
@@ -112,7 +139,6 @@ export default function MultasPage() {
     }
   };
 
-  // Cancelar multa
   const cancelarMulta = async (idMulta) => {
     if (window.confirm("¿Estás seguro de marcar esta multa como pagada?")) {
       try {
@@ -135,34 +161,28 @@ export default function MultasPage() {
     }
   };
 
-  // Cerrar modal
   const cerrarModal = () => {
     setShowModal(false);
     setFormData({
       idSocio: "",
       motivo: "",
-      monto: ""
+      monto: "",
+      idPrestamo: ""
     });
     setErrorModal(null);
   };
 
-  // Obtener nombre de socio
   const getNombreSocio = (idSocio) => {
     const socio = socios.find(s => s.idSocio === idSocio);
     return socio ? socio.nombre : "Desconocido";
   };
 
-  // Filtrar multas por estado
   const multasFiltradas = multas.filter(m => 
     filtroEstado === "TODAS" || m.estado === filtroEstado
   );
 
-  // Calcular totales
   const totalActivas = multas.filter(m => m.estado === "ACTIVA").length;
   const totalPagadas = multas.filter(m => m.estado === "PAGADA").length;
-  const montoTotal = multas
-    .filter(m => m.estado === "ACTIVA")
-    .reduce((sum, m) => sum + parseFloat(m.monto || 0), 0);
 
   if (loading) {
     return (
@@ -196,8 +216,7 @@ export default function MultasPage() {
         </div>
       )}
 
-      {/* Estadísticas */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-2 gap-4 mb-6">
         <div className="bg-white rounded-lg shadow p-6 border-l-4 border-red-500">
           <p className="text-gray-600 text-sm font-medium">Multas Activas</p>
           <p className="text-3xl font-bold text-gray-900 mt-2">{totalActivas}</p>
@@ -206,13 +225,8 @@ export default function MultasPage() {
           <p className="text-gray-600 text-sm font-medium">Multas Pagadas</p>
           <p className="text-3xl font-bold text-gray-900 mt-2">{totalPagadas}</p>
         </div>
-        <div className="bg-white rounded-lg shadow p-6 border-l-4 border-orange-500">
-          <p className="text-gray-600 text-sm font-medium">Monto Total Pendiente</p>
-          <p className="text-3xl font-bold text-gray-900 mt-2">${montoTotal.toFixed(2)}</p>
-        </div>
       </div>
 
-      {/* Filtro de estado */}
       <div className="mb-6 flex gap-3">
         <button
           onClick={() => setFiltroEstado("ACTIVA")}
@@ -246,7 +260,6 @@ export default function MultasPage() {
         </button>
       </div>
 
-      {/* Tabla de multas */}
       {multasFiltradas.length > 0 ? (
         <div className="bg-white rounded-lg shadow-md overflow-hidden">
           <table className="w-full">
@@ -317,10 +330,9 @@ export default function MultasPage() {
         </div>
       )}
 
-      {/* Modal para crear multa */}
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-8 w-full max-w-md shadow-xl">
+          <div className="bg-white rounded-lg p-8 w-full max-w-md shadow-xl max-h-screen overflow-y-auto">
             <h2 className="text-2xl font-bold mb-6 text-gray-900">➕ Nueva Multa</h2>
             
             {errorModal && (
@@ -329,14 +341,13 @@ export default function MultasPage() {
               </div>
             )}
 
-            <form onSubmit={handleSubmit}>
+            <div>
               <div className="mb-4">
                 <label className="block text-gray-700 font-semibold mb-2">Socio *</label>
                 <select
                   value={formData.idSocio}
                   onChange={(e) => setFormData({...formData, idSocio: e.target.value})}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                  required
                 >
                   <option value="">Selecciona un socio</option>
                   {socios.map(s => (
@@ -353,7 +364,6 @@ export default function MultasPage() {
                   value={formData.motivo}
                   onChange={(e) => setFormData({...formData, motivo: e.target.value})}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                  required
                 >
                   <option value="">Selecciona el motivo</option>
                   <option value="Retraso en devolución">Retraso en devolución</option>
@@ -363,6 +373,30 @@ export default function MultasPage() {
                 </select>
               </div>
 
+              {["Retraso en devolución", "Libro dañado", "Libro extraviado"].includes(formData.motivo) && (
+                <div className="mb-4">
+                  <label className="block text-gray-700 font-semibold mb-2">Préstamo relacionado *</label>
+                  {prestamosFiltrados.length > 0 ? (
+                    <select
+                      value={formData.idPrestamo}
+                      onChange={(e) => setFormData({...formData, idPrestamo: e.target.value})}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    >
+                      <option value="">Selecciona un préstamo</option>
+                      {prestamosFiltrados.map(p => (
+                        <option key={p.idPrestamo} value={p.idPrestamo}>
+                          Préstamo #{p.idPrestamo} - {p.Libro?.titulo || 'Libro desconocido'}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div className="w-full px-4 py-2 border border-yellow-300 bg-yellow-50 rounded-lg text-yellow-800">
+                      ⚠️ Este socio no tiene préstamos activos
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="mb-4">
                 <label className="block text-gray-700 font-semibold mb-2">Monto *</label>
                 <input
@@ -371,10 +405,20 @@ export default function MultasPage() {
                   min="0.01"
                   max="10000"
                   value={formData.monto}
-                  onChange={(e) => setFormData({...formData, monto: e.target.value})}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value.split('.')[0].length <= 5) {
+                      setFormData({...formData, monto: value});
+                    }
+                  }}
+                  onKeyPress={(e) => {
+                    const value = e.target.value;
+                    if (value.split('.')[0].length >= 5 && e.key !== '.' && e.key !== 'Backspace' && !value.includes('.')) {
+                      e.preventDefault();
+                    }
+                  }}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
                   placeholder="0.00"
-                  required
                 />
                 <p className="text-xs text-gray-500 mt-1">Monto máximo: $10,000</p>
               </div>
@@ -382,25 +426,34 @@ export default function MultasPage() {
               <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="text-sm text-blue-800">
                   <strong>ℹ️ Información:</strong> La multa se registrará automáticamente con la fecha de hoy.
+                  {["Libro dañado", "Libro extraviado"].includes(formData.motivo) && (
+                    <span className="block mt-2">
+                      ⚠️ Al registrar esta multa, el libro será marcado como {formData.motivo === "Libro dañado" ? "dañado" : "extraviado"} y el préstamo se cerrará.
+                    </span>
+                  )}
+                  {formData.motivo === "Retraso en devolución" && (
+                    <span className="block mt-2">
+                      📚 El libro será devuelto y estará disponible nuevamente.
+                    </span>
+                  )}
                 </p>
               </div>
 
               <div className="flex gap-3">
                 <button
-                  type="submit"
+                  onClick={handleSubmit}
                   className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg font-semibold transition shadow-md hover:shadow-lg"
                 >
                   ✨ Crear Multa
                 </button>
                 <button
-                  type="button"
                   onClick={cerrarModal}
                   className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 py-2 rounded-lg font-semibold transition"
                 >
                   Cancelar
                 </button>
               </div>
-            </form>
+            </div>
           </div>
         </div>
       )}
