@@ -5,6 +5,8 @@ export default function SociosPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [socioAEliminar, setSocioAEliminar] = useState(null);
   const [editando, setEditando] = useState(null);
   const [formData, setFormData] = useState({
     nombre: "",
@@ -16,7 +18,6 @@ export default function SociosPage() {
 
   const API_URL = "http://localhost:3001/api/socios";
 
-  // Obtener todos los socios
   useEffect(() => {
     fetchSocios();
   }, []);
@@ -37,14 +38,10 @@ export default function SociosPage() {
     }
   };
 
-  // Crear o actualizar socio
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // Limpiar errores previos
     setErrorModal(null);
 
-    // Validar nombre
     if (!formData.nombre || formData.nombre.trim().length === 0) {
       setErrorModal("El nombre es requerido");
       return;
@@ -62,7 +59,6 @@ export default function SociosPage() {
       return;
     }
 
-    // Validar DNI
     if (!formData.dni || formData.dni.trim().length === 0) {
       setErrorModal("El DNI es requerido");
       return;
@@ -76,7 +72,6 @@ export default function SociosPage() {
       return;
     }
 
-    // Validar Email
     if (!formData.email || formData.email.trim().length === 0) {
       setErrorModal("El email es requerido");
       return;
@@ -91,7 +86,6 @@ export default function SociosPage() {
       return;
     }
 
-    // Validar Teléfono
     if (!formData.telefono || formData.telefono.trim().length === 0) {
       setErrorModal("El teléfono es requerido");
       return;
@@ -129,25 +123,30 @@ export default function SociosPage() {
     }
   };
 
-  // Eliminar socio
-  const eliminarSocio = async (id) => {
-    if (window.confirm("¿Estás seguro de eliminar este socio?")) {
-      try {
-        const response = await fetch(`${API_URL}/${id}`, {
-          method: "DELETE"
-        });
+  const confirmarEliminarSocio = (socio) => {
+    setSocioAEliminar(socio);
+    setShowDeleteModal(true);
+  };
 
-        if (!response.ok) throw new Error("Error al eliminar");
+  const eliminarSocio = async () => {
+    try {
+      const response = await fetch(`${API_URL}/${socioAEliminar.idSocio}`, {
+        method: "DELETE"
+      });
 
-        await fetchSocios();
-      } catch (error) {
-        console.error("Error al eliminar socio:", error);
-        setError("Error al eliminar el socio");
-      }
+      if (!response.ok) throw new Error("Error al eliminar");
+
+      await fetchSocios();
+      setShowDeleteModal(false);
+      setSocioAEliminar(null);
+    } catch (error) {
+      console.error("Error al eliminar socio:", error);
+      setError("Error al eliminar el socio");
+      setShowDeleteModal(false);
+      setSocioAEliminar(null);
     }
   };
 
-  // Abrir modal para editar
   const editarSocio = (socio) => {
     setEditando(socio.idSocio);
     setFormData({
@@ -159,7 +158,6 @@ export default function SociosPage() {
     setShowModal(true);
   };
 
-  // Cerrar modal y resetear form
   const cerrarModal = () => {
     setShowModal(false);
     setEditando(null);
@@ -201,14 +199,12 @@ export default function SociosPage() {
           </button>
         </div>
 
-        {/* Mensaje de error */}
         {error && (
           <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
             {error}
           </div>
         )}
 
-        {/* Tabla de socios */}
         {socios.length > 0 ? (
           <div className="bg-white rounded-lg shadow-md overflow-hidden">
             <table className="w-full">
@@ -238,7 +234,7 @@ export default function SociosPage() {
                         Editar
                       </button>
                       <button
-                        onClick={() => eliminarSocio(socio.idSocio)}
+                        onClick={() => confirmarEliminarSocio(socio)}
                         className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded font-semibold transition inline-block"
                       >
                         Eliminar
@@ -257,7 +253,6 @@ export default function SociosPage() {
           </div>
         )}
 
-        {/* Modal para crear/editar */}
         {showModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg p-8 w-full max-w-md shadow-xl">
@@ -271,7 +266,7 @@ export default function SociosPage() {
                 </div>
               )}
 
-              <form onSubmit={handleSubmit}>
+              <div>
                 <div className="mb-4">
                   <label className="block text-gray-700 font-semibold mb-2">Nombre *</label>
                   <input
@@ -280,7 +275,6 @@ export default function SociosPage() {
                     onChange={(e) => setFormData({...formData, nombre: e.target.value})}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
                     placeholder="Ingresa el nombre del socio"
-                    required
                   />
                 </div>
 
@@ -292,7 +286,6 @@ export default function SociosPage() {
                     onChange={(e) => setFormData({...formData, dni: e.target.value})}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
                     placeholder="Ingresa el DNI"
-                    required
                   />
                 </div>
 
@@ -320,20 +313,57 @@ export default function SociosPage() {
 
                 <div className="flex gap-3">
                   <button
-                    type="submit"
+                    onClick={handleSubmit}
                     className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg font-semibold transition shadow-md hover:shadow-lg"
                   >
                     {editando ? "🔄 Actualizar" : "✨ Crear"}
                   </button>
                   <button
-                    type="button"
                     onClick={cerrarModal}
                     className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 py-2 rounded-lg font-semibold transition"
                   >
                     Cancelar
                   </button>
                 </div>
-              </form>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showDeleteModal && socioAEliminar && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg p-8 w-full max-w-md shadow-xl">
+              <div className="text-center">
+                <div className="text-6xl mb-4">⚠️</div>
+                <h2 className="text-2xl font-bold mb-4 text-gray-900">¿Eliminar Socio?</h2>
+                <p className="text-gray-700 mb-2">
+                  Estás a punto de eliminar al socio:
+                </p>
+                <p className="text-lg font-bold text-gray-900 mb-6">
+                  {socioAEliminar.nombre}
+                </p>
+                <p className="text-sm text-gray-600 mb-6">
+                  Esta acción no se puede deshacer.
+                </p>
+                
+                <div className="flex gap-3">
+                  <button
+                    onClick={eliminarSocio}
+                    className="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg font-semibold transition shadow-md hover:shadow-lg"
+                  >
+                    Sí, Eliminar
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowDeleteModal(false);
+                      setSocioAEliminar(null);
+                    }}
+                    className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 py-2 rounded-lg font-semibold transition"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}

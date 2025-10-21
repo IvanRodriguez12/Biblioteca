@@ -7,6 +7,8 @@ export default function MultasPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [showPagarModal, setShowPagarModal] = useState(false);
+  const [multaAPagar, setMultaAPagar] = useState(null);
   const [formData, setFormData] = useState({
     idSocio: "",
     motivo: "",
@@ -139,25 +141,32 @@ export default function MultasPage() {
     }
   };
 
-  const cancelarMulta = async (idMulta) => {
-    if (window.confirm("¿Estás seguro de marcar esta multa como pagada?")) {
-      try {
-        const response = await fetch(`${API_URL}/${idMulta}/cancelar`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" }
-        });
+  const confirmarPagarMulta = (multa) => {
+    setMultaAPagar(multa);
+    setShowPagarModal(true);
+  };
 
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || "Error al cancelar multa");
-        }
+  const cancelarMulta = async () => {
+    try {
+      const response = await fetch(`${API_URL}/${multaAPagar.idMulta}/cancelar`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" }
+      });
 
-        await fetchAllData();
-        setError(null);
-      } catch (error) {
-        console.error("Error al cancelar multa:", error);
-        setError(error.message || "Error al cancelar la multa");
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Error al cancelar multa");
       }
+
+      await fetchAllData();
+      setError(null);
+      setShowPagarModal(false);
+      setMultaAPagar(null);
+    } catch (error) {
+      console.error("Error al cancelar multa:", error);
+      setError(error.message || "Error al cancelar la multa");
+      setShowPagarModal(false);
+      setMultaAPagar(null);
     }
   };
 
@@ -300,7 +309,7 @@ export default function MultasPage() {
                   <td className="px-6 py-4 text-center">
                     {multa.estado === "ACTIVA" && (
                       <button
-                        onClick={() => cancelarMulta(multa.idMulta)}
+                        onClick={() => confirmarPagarMulta(multa)}
                         className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded font-semibold transition"
                       >
                         Pagar
@@ -448,6 +457,46 @@ export default function MultasPage() {
                 </button>
                 <button
                   onClick={cerrarModal}
+                  className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 py-2 rounded-lg font-semibold transition"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showPagarModal && multaAPagar && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-8 w-full max-w-md shadow-xl">
+            <div className="text-center">
+              <div className="text-6xl mb-4">💰</div>
+              <h2 className="text-2xl font-bold mb-4 text-gray-900">¿Marcar multa como pagada?</h2>
+              <div className="mb-6 text-left bg-gray-50 p-4 rounded-lg">
+                <p className="text-sm text-gray-600 mb-1">Socio:</p>
+                <p className="font-semibold text-gray-900 mb-3">{getNombreSocio(multaAPagar.idSocio)}</p>
+                <p className="text-sm text-gray-600 mb-1">Motivo:</p>
+                <p className="font-semibold text-gray-900 mb-3">{multaAPagar.motivo}</p>
+                <p className="text-sm text-gray-600 mb-1">Monto:</p>
+                <p className="font-semibold text-green-600 text-xl">${parseFloat(multaAPagar.monto).toFixed(2)}</p>
+              </div>
+              <p className="text-sm text-gray-600 mb-6">
+                Esta acción marcará la multa como pagada.
+              </p>
+              
+              <div className="flex gap-3">
+                <button
+                  onClick={cancelarMulta}
+                  className="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg font-semibold transition shadow-md hover:shadow-lg"
+                >
+                  Sí, Pagar
+                </button>
+                <button
+                  onClick={() => {
+                    setShowPagarModal(false);
+                    setMultaAPagar(null);
+                  }}
                   className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 py-2 rounded-lg font-semibold transition"
                 >
                   Cancelar
