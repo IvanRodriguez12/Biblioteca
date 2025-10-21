@@ -94,12 +94,23 @@ export default function LibrosPage() {
     return true;
   };
 
-  const handleNumberInput = (value, min = 0, max = 999) => {
-    if (value === "" || value === undefined) return min;
-    if (value.length > 3) return max;
-    const num = Number(value);
-    if (isNaN(num)) return min;
-    return Math.max(Math.min(num, max), min);
+  const handleNumberInput = (value) => {
+    // Permitir campo vacío
+    if (value === "" || value === undefined) return "";
+    
+    // Limpiar input: solo números
+    const cleaned = value.replace(/[^0-9]/g, "");
+    
+    // Limitar a 3 dígitos
+    if (cleaned.length > 3) return cleaned.slice(0, 3);
+    
+    return cleaned;
+  };
+
+  const validarCantidad = (valor, minimo = 1) => {
+    if (valor === "" || valor === undefined) return false;
+    const num = parseInt(valor);
+    return !isNaN(num) && num >= minimo && num <= 200;
   };
 
   const handleSubmit = (e) => {
@@ -110,33 +121,25 @@ export default function LibrosPage() {
     if (!validarAutor(formData.autor)) return;
     if (!validarISBN(formData.isbn)) return;
 
-    const cantidad = parseInt(formData.cantidad) || 0;
-
-    if (cantidad < 1 || cantidad > 200) {
-      setErrorModal("La cantidad debe estar entre 1 y 200 copias");
-      return;
-    }
-
-    // Para crear: todos disponibles, 0 prestados y 0 dañados
-    // Para editar: mantener valores de dañados y prestados
-    let datosEnvio;
-    if (editando) {
-      datosEnvio = {
-        titulo: formData.titulo,
-        autor: formData.autor,
-        isbn: formData.isbn,
-        cantidadDisponible: formData.cantidadDisponible,
-        cantidadPrestado: formData.cantidadPrestado,
-        cantidadDanado: formData.cantidadDanado
-      };
-      
-      const suma = parseInt(formData.cantidadDisponible) + parseInt(formData.cantidadPrestado) + parseInt(formData.cantidadDanado);
-      if (suma > 200) {
-        setErrorModal("La suma total no puede exceder 200 copias");
+    if (!editando) {
+      // Validar cantidad para crear nuevo libro
+      if (formData.cantidad === "" || formData.cantidad === undefined) {
+        setErrorModal("Debes ingresar al menos una copia");
         return;
       }
-    } else {
-      datosEnvio = {
+
+      const cantidad = parseInt(formData.cantidad);
+      if (isNaN(cantidad) || cantidad < 1) {
+        setErrorModal("La cantidad debe ser al menos 1 copia");
+        return;
+      }
+
+      if (cantidad > 200) {
+        setErrorModal("La cantidad no puede exceder 200 copias");
+        return;
+      }
+
+      const datosEnvio = {
         titulo: formData.titulo,
         autor: formData.autor,
         isbn: formData.isbn,
@@ -145,28 +148,84 @@ export default function LibrosPage() {
         cantidadPrestado: 0,
         cantidadDanado: 0
       };
+
+      fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(datosEnvio)
+      })
+        .then(response => {
+          if (!response.ok) throw new Error("Error al guardar libro");
+          return response.json();
+        })
+        .then(() => {
+          fetchLibros();
+          cerrarModal();
+        })
+        .catch(error => {
+          console.error("Error al guardar libro:", error);
+          setErrorModal(error.message || "Error al guardar el libro");
+        });
+    } else {
+      // Validar edición - convertir vacíos a 0 y validar
+      const disponible = formData.cantidadDisponible === "" ? 0 : parseInt(formData.cantidadDisponible);
+      const prestado = formData.cantidadPrestado === "" ? 0 : parseInt(formData.cantidadPrestado);
+      const danado = formData.cantidadDanado === "" ? 0 : parseInt(formData.cantidadDanado);
+
+      // Validar que sean números válidos
+      if (isNaN(disponible) || disponible < 0 || disponible > 200) {
+        setErrorModal("Cantidad de disponibles inválida (0-200)");
+        return;
+      }
+      if (isNaN(prestado) || prestado < 0 || prestado > 200) {
+        setErrorModal("Cantidad de prestados inválida (0-200)");
+        return;
+      }
+      if (isNaN(danado) || danado < 0 || danado > 200) {
+        setErrorModal("Cantidad de dañados inválida (0-200)");
+        return;
+      }
+
+      const suma = disponible + prestado + danado;
+
+      if (suma === 0) {
+        setErrorModal("Debe haber al menos una copia en total");
+        return;
+      }
+
+      if (suma > 200) {
+        setErrorModal("La suma total no puede exceder 200 copias");
+        return;
+      }
+
+      const datosEnvio = {
+        titulo: formData.titulo.trim(),
+        autor: formData.autor.trim(),
+        isbn: formData.isbn.trim(),
+        cantidad: suma,
+        cantidadDisponible: disponible,
+        cantidadPrestado: prestado,
+        cantidadDanado: danado
+      };
+
+      fetch(`${API_URL}/${editando}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(datosEnvio)
+      })
+        .then(response => {
+          if (!response.ok) throw new Error("Error al guardar libro");
+          return response.json();
+        })
+        .then(() => {
+          fetchLibros();
+          cerrarModal();
+        })
+        .catch(error => {
+          console.error("Error al guardar libro:", error);
+          setErrorModal(error.message || "Error al guardar el libro");
+        });
     }
-
-    const url = editando ? `${API_URL}/${editando}` : API_URL;
-    const method = editando ? "PUT" : "POST";
-
-    fetch(url, {
-      method,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(datosEnvio)
-    })
-      .then(response => {
-        if (!response.ok) throw new Error("Error al guardar libro");
-        return response.json();
-      })
-      .then(() => {
-        fetchLibros();
-        cerrarModal();
-      })
-      .catch(error => {
-        console.error("Error al guardar libro:", error);
-        setErrorModal(error.message || "Error al guardar el libro");
-      });
   };
 
   const abrirModalEliminar = (libro) => {
@@ -206,9 +265,9 @@ export default function LibrosPage() {
       autor: libro.autor,
       isbn: libro.isbn,
       cantidad: libro.cantidad,
-      cantidadDisponible: libro.cantidadDisponible,
-      cantidadPrestado: libro.cantidadPrestado,
-      cantidadDanado: libro.cantidadDanado
+      cantidadDisponible: libro.cantidadDisponible === 0 ? "" : libro.cantidadDisponible.toString(),
+      cantidadPrestado: libro.cantidadPrestado === 0 ? "" : libro.cantidadPrestado.toString(),
+      cantidadDanado: libro.cantidadDanado === 0 ? "" : libro.cantidadDanado.toString()
     });
     setShowModal(true);
   };
@@ -342,7 +401,11 @@ export default function LibrosPage() {
                     type="text"
                     value={formData.titulo}
                     onChange={(e) => setFormData({...formData, titulo: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent ${
+                      formData.titulo && (formData.titulo.trim().length < 3 || formData.titulo.trim().length > 150)
+                        ? "border-red-500 bg-red-50"
+                        : "border-gray-300"
+                    }`}
                     placeholder="Ej: Don Quijote"
                   />
                   <p className="text-xs text-gray-500 mt-1">3-150 caracteres</p>
@@ -354,7 +417,11 @@ export default function LibrosPage() {
                     type="text"
                     value={formData.autor}
                     onChange={(e) => setFormData({...formData, autor: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent ${
+                      formData.autor && (formData.autor.trim().length < 3 || formData.autor.trim().length > 100)
+                        ? "border-red-500 bg-red-50"
+                        : "border-gray-300"
+                    }`}
                     placeholder="Ej: Miguel de Cervantes"
                   />
                   <p className="text-xs text-gray-500 mt-1">3-100 caracteres, solo letras</p>
@@ -366,7 +433,11 @@ export default function LibrosPage() {
                     type="text"
                     value={formData.isbn}
                     onChange={(e) => setFormData({...formData, isbn: e.target.value})}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent ${
+                      formData.isbn && (formData.isbn.length < 10 || formData.isbn.length > 17)
+                        ? "border-red-500 bg-red-50"
+                        : "border-gray-300"
+                    }`}
                     placeholder="Ej: 978-84-11-47"
                   />
                   <p className="text-xs text-gray-500 mt-1">10-17 caracteres (números y guiones)</p>
@@ -380,10 +451,13 @@ export default function LibrosPage() {
                       inputMode="numeric"
                       value={formData.cantidad}
                       onChange={(e) => {
-                        const cant = handleNumberInput(e.target.value, 1, 200);
-                        setFormData({...formData, cantidad: cant});
+                        setFormData({...formData, cantidad: handleNumberInput(e.target.value)});
                       }}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                      className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent ${
+                        !validarCantidad(formData.cantidad, 1)
+                          ? "border-red-500 bg-red-50"
+                          : "border-gray-300"
+                      }`}
                       placeholder="Ingresa la cantidad"
                     />
                     <p className="text-xs text-gray-500 mt-1">1-200 copias (máx 3 dígitos)</p>
@@ -392,48 +466,60 @@ export default function LibrosPage() {
               </div>
 
               {editando && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-                  <div>
-                    <label className="block text-gray-700 font-semibold mb-2">✅ Disponibles *</label>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={formData.cantidadDisponible}
-                      onChange={(e) => setFormData({...formData, cantidadDisponible: handleNumberInput(e.target.value, 0, 200)})}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                    />
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                    <div>
+                      <label className="block text-gray-700 font-semibold mb-2">✅ Disponibles *</label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={formData.cantidadDisponible}
+                        onChange={(e) => setFormData({...formData, cantidadDisponible: handleNumberInput(e.target.value)})}
+                        className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent ${
+                          !validarCantidad(formData.cantidadDisponible, 0)
+                            ? "border-red-500 bg-red-50"
+                            : "border-gray-300"
+                        }`}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-gray-700 font-semibold mb-2">📤 Prestados *</label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={formData.cantidadPrestado}
+                        onChange={(e) => setFormData({...formData, cantidadPrestado: handleNumberInput(e.target.value)})}
+                        className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent ${
+                          !validarCantidad(formData.cantidadPrestado, 0)
+                            ? "border-red-500 bg-red-50"
+                            : "border-gray-300"
+                        }`}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-gray-700 font-semibold mb-2">❌ Dañados *</label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={formData.cantidadDanado}
+                        onChange={(e) => setFormData({...formData, cantidadDanado: handleNumberInput(e.target.value)})}
+                        className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent ${
+                          !validarCantidad(formData.cantidadDanado, 0)
+                            ? "border-red-500 bg-red-50"
+                            : "border-gray-300"
+                        }`}
+                      />
+                    </div>
                   </div>
 
-                  <div>
-                    <label className="block text-gray-700 font-semibold mb-2">📤 Prestados *</label>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={formData.cantidadPrestado}
-                      onChange={(e) => setFormData({...formData, cantidadPrestado: handleNumberInput(e.target.value, 0, 200)})}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                    />
+                  <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-800">
+                      <strong>Total:</strong> {(parseInt(formData.cantidadDisponible) || 0) + (parseInt(formData.cantidadPrestado) || 0) + (parseInt(formData.cantidadDanado) || 0)} copias (máx 200)
+                    </p>
                   </div>
-
-                  <div>
-                    <label className="block text-gray-700 font-semibold mb-2">❌ Dañados *</label>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={formData.cantidadDanado}
-                      onChange={(e) => setFormData({...formData, cantidadDanado: handleNumberInput(e.target.value, 0, 200)})}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {editando && (
-                <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <p className="text-sm text-blue-800">
-                    <strong>Total:</strong> {(parseInt(formData.cantidadDisponible) || 0) + (parseInt(formData.cantidadPrestado) || 0) + (parseInt(formData.cantidadDanado) || 0)} copias
-                  </p>
-                </div>
+                </>
               )}
 
               <div className="flex gap-3 mt-6">

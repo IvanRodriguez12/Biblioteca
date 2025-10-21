@@ -10,6 +10,7 @@ export default function PrestamosPage() {
   const [modalMode, setModalMode] = useState("crear");
   const [selectedPrestamo, setSelectedPrestamo] = useState(null);
   const [errorModal, setErrorModal] = useState(null);
+  const [showCalendar, setShowCalendar] = useState(false);
   const [formData, setFormData] = useState({
     idSocio: "",
     idLibro: "",
@@ -21,49 +22,162 @@ export default function PrestamosPage() {
   const SOCIOS_URL = "http://localhost:3001/api/socios";
   const LIBROS_URL = "http://localhost:3001/api/libros";
 
+  // Obtener fecha actual en formato YYYY-MM-DD
+  const getFechaHoy = () => {
+    const hoy = new Date();
+    hoy.setMinutes(hoy.getMinutes() - hoy.getTimezoneOffset());
+    return hoy.toISOString().split('T')[0];
+  };
+
   useEffect(() => {
     fetchAllData();
   }, []);
 
+  useEffect(() => {
+    if (showModal && modalMode === "crear") {
+      setFormData(prev => ({
+        ...prev,
+        fechaInicio: getFechaHoy()
+      }));
+    }
+  }, [showModal]);
+
   const fetchAllData = async () => {
     try {
       setLoading(true);
-      const [prestamosRes, sociosRes, librosRes] = await Promise.all([
-        fetch(API_URL),
-        fetch(SOCIOS_URL),
-        fetch(LIBROS_URL)
-      ]);
+      const prestamosRes = await fetch(API_URL);
+      const sociosRes = await fetch(SOCIOS_URL);
+      const librosRes = await fetch(LIBROS_URL);
 
-      if (!prestamosRes.ok || !sociosRes.ok || !librosRes.ok) {
-        throw new Error("Error al obtener datos");
-      }
+      if (!prestamosRes.ok) throw new Error("Error al obtener préstamos");
+      if (!sociosRes.ok) throw new Error("Error al obtener socios");
+      if (!librosRes.ok) throw new Error("Error al obtener libros");
 
       const prestamosData = await prestamosRes.json();
       const sociosData = await sociosRes.json();
       const librosData = await librosRes.json();
 
-      setPrestamos(prestamosData);
-      setSocios(sociosData);
-      setLibros(librosData);
+      setPrestamos(prestamosData || []);
+      setSocios(sociosData || []);
+      setLibros(librosData || []);
       setError(null);
     } catch (error) {
-      console.error("Error al obtener datos:", error);
-      setError("No se pudieron cargar los datos");
+      console.error("Error en fetchAllData:", error);
+      setError(error.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const convertirAISO = (fecha) => {
-    const [dia, mes, año] = fecha.split("/");
-    return `${año}-${mes}-${dia}`;
-  };
+  const CalendarPicker = () => {
+    const [currentMonth, setCurrentMonth] = useState(new Date());
 
-  const validarFecha = (fecha) => {
-    const regex = /^(\d{2})\/(\d{2})\/(\d{4})$/;
-    if (!regex.test(fecha)) return false;
-    const [, dia, mes, año] = fecha.match(regex);
-    return dia <= 31 && mes <= 12 && año >= 1900 && año <= 2100;
+    const daysInMonth = (date) => new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+    const firstDayOfMonth = (date) => new Date(date.getFullYear(), date.getMonth(), 1).getDay();
+
+    const handleDayClick = (day) => {
+      const selectedDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+      const dateString = selectedDate.toISOString().split('T')[0];
+
+      const fechaInicio = new Date(formData.fechaInicio);
+      if (selectedDate < fechaInicio) {
+        setErrorModal("La fecha no puede ser anterior a la fecha de inicio");
+        return;
+      }
+
+      const fechaMax = new Date(fechaInicio);
+      fechaMax.setFullYear(fechaMax.getFullYear() + 50);
+      if (selectedDate > fechaMax) {
+        setErrorModal("El préstamo no puede superar 50 años");
+        return;
+      }
+
+      setFormData({...formData, fechaDevolucion: dateString});
+      setShowCalendar(false);
+    };
+
+    const isDateDisabled = (day) => {
+      const selectedDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+      const fechaInicio = new Date(formData.fechaInicio);
+      const fechaMax = new Date(fechaInicio);
+      fechaMax.setFullYear(fechaMax.getFullYear() + 50);
+
+      return selectedDate < fechaInicio || selectedDate > fechaMax;
+    };
+
+    const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+      "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+    const dayNames = ["D", "L", "M", "X", "J", "V", "S"];
+
+    const days = [];
+    for (let i = 0; i < firstDayOfMonth(currentMonth); i++) {
+      days.push(null);
+    }
+    for (let i = 1; i <= daysInMonth(currentMonth); i++) {
+      days.push(i);
+    }
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-lg p-6 shadow-xl">
+          <div className="flex justify-between items-center mb-4">
+            <button
+              type="button"
+              onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1))}
+              className="px-3 py-2 hover:bg-gray-200 rounded font-bold text-lg"
+            >
+              ←
+            </button>
+            <span className="font-semibold text-gray-800 text-lg min-w-40 text-center">
+              {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
+            </span>
+            <button
+              type="button"
+              onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1))}
+              className="px-3 py-2 hover:bg-gray-200 rounded font-bold text-lg"
+            >
+              →
+            </button>
+          </div>
+
+          <div className="grid grid-cols-7 gap-2 mb-3">
+            {dayNames.map(d => (
+              <div key={d} className="w-10 h-10 flex items-center justify-center font-bold text-gray-600">
+                {d}
+              </div>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-7 gap-2 mb-6">
+            {days.map((day, i) => (
+              <button
+                key={i}
+                type="button"
+                disabled={!day || isDateDisabled(day)}
+                onClick={() => day && handleDayClick(day)}
+                className={`w-10 h-10 rounded font-semibold text-sm ${
+                  !day ? "invisible" :
+                  isDateDisabled(day) ? "bg-gray-100 text-gray-400 cursor-not-allowed" :
+                  formData.fechaDevolucion === `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}` ?
+                  "bg-purple-600 text-white" :
+                  "hover:bg-purple-200 text-gray-700"
+                }`}
+              >
+                {day}
+              </button>
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowCalendar(false)}
+            className="w-full px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-800 rounded-lg font-semibold"
+          >
+            Cerrar
+          </button>
+        </div>
+      </div>
+    );
   };
 
   const handleSubmit = async (e) => {
@@ -82,51 +196,32 @@ export default function PrestamosPage() {
       setErrorModal("La fecha de inicio es requerida");
       return;
     }
-    if (!validarFecha(formData.fechaInicio)) {
-      setErrorModal("La fecha de inicio no es válida (formato: DD/MM/YYYY)");
-      return;
-    }
     if (!formData.fechaDevolucion) {
       setErrorModal("La fecha de vencimiento es requerida");
       return;
     }
-    if (!validarFecha(formData.fechaDevolucion)) {
-      setErrorModal("La fecha de vencimiento no es válida (formato: DD/MM/YYYY)");
-      return;
-    }
 
-    const fechaInicio = new Date(convertirAISO(formData.fechaInicio));
-    const fechaDevolucion = new Date(convertirAISO(formData.fechaDevolucion));
-    const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
-
-    if (fechaInicio < hoy) {
-      setErrorModal("La fecha de inicio no puede ser una fecha pasada");
-      return;
-    }
+    const fechaInicio = new Date(formData.fechaInicio);
+    const fechaDevolucion = new Date(formData.fechaDevolucion);
 
     if (fechaInicio >= fechaDevolucion) {
       setErrorModal("La fecha de vencimiento debe ser posterior a la fecha de inicio");
       return;
     }
 
-    const fechaDevolucionMax = new Date(fechaInicio);
-    fechaDevolucionMax.setFullYear(fechaDevolucionMax.getFullYear() + 50);
-
-    if (fechaDevolucion > fechaDevolucionMax) {
-      setErrorModal("El préstamo no puede superar 50 años de duración");
-      return;
-    }
-
     try {
+      // Crear objetos Date con la fecha completa para evitar problemas de zona horaria
+      const fechaInicioCompleta = new Date(formData.fechaInicio + 'T12:00:00');
+      const fechaDevolucionCompleta = new Date(formData.fechaDevolucion + 'T12:00:00');
+
       const response = await fetch(API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           idSocio: parseInt(formData.idSocio),
           idLibro: parseInt(formData.idLibro),
-          fechaInicio: convertirAISO(formData.fechaInicio),
-          fechaDevolucion: convertirAISO(formData.fechaDevolucion)
+          fechaInicio: fechaInicioCompleta.toISOString(),
+          fechaDevolucion: fechaDevolucionCompleta.toISOString()
         })
       });
 
@@ -147,13 +242,14 @@ export default function PrestamosPage() {
     setErrorModal(null);
 
     try {
-      const hoy = new Date().toISOString().split('T')[0];
-      
+      // Obtener fecha actual y establecer hora al mediodía
+      const fechaHoy = getFechaHoy();
+
       const response = await fetch(`${API_URL}/${selectedPrestamo.idPrestamo}/devolver`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          fechaRealDevolucion: hoy
+          fechaRealDevolucion: fechaHoy
         })
       });
 
@@ -187,6 +283,7 @@ export default function PrestamosPage() {
       fechaDevolucion: ""
     });
     setErrorModal(null);
+    setShowCalendar(false);
   };
 
   const getNombreSocio = (idSocio) => {
@@ -417,39 +514,21 @@ export default function PrestamosPage() {
                   </div>
 
                   <div className="mb-4">
-                    <label className="block text-gray-700 font-semibold mb-2">Fecha Inicio (DD/MM/YYYY) *</label>
-                    <input
-                      type="text"
-                      placeholder="DD/MM/YYYY"
-                      value={formData.fechaInicio}
-                      onChange={(e) => {
-                        const valor = e.target.value;
-                        if (/^[\d/]*$/.test(valor) && valor.length <= 10) {
-                          setFormData({...formData, fechaInicio: valor});
-                        }
-                      }}
-                      maxLength="10"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">No puede ser una fecha pasada</p>
+                    <label className="block text-gray-700 font-semibold mb-2">Fecha Inicio</label>
+                    <div className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50 text-gray-700 font-semibold">
+                      {formData.fechaInicio ? new Date(formData.fechaInicio).toLocaleDateString("es-ES") : ""}
+                    </div>
                   </div>
 
                   <div className="mb-6">
-                    <label className="block text-gray-700 font-semibold mb-2">Fecha Vencimiento (DD/MM/YYYY) *</label>
-                    <input
-                      type="text"
-                      placeholder="DD/MM/YYYY"
-                      value={formData.fechaDevolucion}
-                      onChange={(e) => {
-                        const valor = e.target.value;
-                        if (/^[\d/]*$/.test(valor) && valor.length <= 10) {
-                          setFormData({...formData, fechaDevolucion: valor});
-                        }
-                      }}
-                      maxLength="10"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">Máximo 50 años desde la fecha de inicio</p>
+                    <label className="block text-gray-700 font-semibold mb-2">Fecha Vencimiento *</label>
+                    <button
+                      type="button"
+                      onClick={() => setShowCalendar(true)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-white hover:bg-purple-50 font-semibold text-gray-700"
+                    >
+                      {formData.fechaDevolucion ? new Date(formData.fechaDevolucion).toLocaleDateString("es-ES") : "📅 Selecciona fecha"}
+                    </button>
                   </div>
 
                   <div className="flex gap-3">
@@ -523,6 +602,8 @@ export default function PrestamosPage() {
           </div>
         </div>
       )}
+
+      {showCalendar && <CalendarPicker />}
     </div>
   );
 }
