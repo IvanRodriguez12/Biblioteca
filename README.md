@@ -74,19 +74,13 @@ BibliotecaApp/
 - **Préstamo** → socio, libro, fechaInicio, fechaDevolucion, estadoPrestamo
 - **Multa** → socio, préstamo, motivo, monto, fecha, estado
 
-### Relaciones del modelo:
-- Un **Socio** puede tener **muchos Préstamos** y **muchas Multas**
-- Un **Libro** puede estar asociado a **muchos Préstamos**
-- Un **Préstamo** pertenece a **un Socio** y a **un Libro**
-- Una **Multa** pertenece a **un Socio** y puede estar relacionada con **un Préstamo** (opcional)
-
 ---
 
 ## 🚀 Instalación y ejecución
 
 ### 1️⃣ Clonar el repositorio
 ```bash
-git clone <URL_DEL_REPOSITORIO>
+git clone https://github.com/IvanRodriguez12/Biblioteca.git
 cd Biblioteca
 ```
 
